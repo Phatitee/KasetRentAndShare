@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/cloudinary_service.dart';
+import '../../services/firestore_service.dart';
+import '../../models/rental_item_model.dart';
 
 class PostRentalScreen extends StatefulWidget {
   const PostRentalScreen({super.key});
@@ -97,8 +100,31 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Upload images to Firebase Storage
-      // TODO: Create rental item in Firestore
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final cloudinaryService = CloudinaryService();
+      final firestoreService = FirestoreService();
+
+      // Upload images to Cloudinary
+      final imageUrls = await cloudinaryService.uploadMultipleImages(
+        _images,
+        'kaset_rentals',
+      );
+
+      // Create rental item in Firestore
+      final item = RentalItemModel(
+        id: '',
+        ownerId: authService.currentUser!.uid,
+        itemName: _itemNameController.text.trim(),
+        category: _selectedCategory,
+        condition: _selectedCondition,
+        dailyRate: double.parse(_dailyRateController.text),
+        deposit: double.parse(_depositController.text),
+        description: _descriptionController.text.trim(),
+        imageUrls: imageUrls,
+        createdAt: DateTime.now(),
+      );
+
+      await firestoreService.createRentalItem(item);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
