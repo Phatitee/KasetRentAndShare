@@ -11,7 +11,7 @@ plugins {
 android {
     namespace = "com.ku.rentshare.kaset_rentshare"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "27.3.13750724"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
