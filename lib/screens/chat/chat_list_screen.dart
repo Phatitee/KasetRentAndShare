@@ -110,6 +110,7 @@ class _ChatListItem extends StatelessWidget {
                   chatId: chat.id,
                   otherUserId: otherUserId,
                   otherUserName: otherUserName,
+                  rentalItemId: chat.rentalItemId,
                   rentalItemName: chat.rentalItemName,
                 ),
               ),
