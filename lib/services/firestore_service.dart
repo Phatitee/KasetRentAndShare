@@ -1,7 +1,4 @@
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:io';
-import 'package:path/path.dart' as path;
 import '../models/rental_item_model.dart';
 import '../models/rental_request_model.dart';
 import '../models/offer_model.dart';
@@ -9,52 +6,13 @@ import '../models/chat_message_model.dart';
 import '../models/user_model.dart';
 import '../models/rental_contract_model.dart';
 import '../models/review_model.dart';
+import 'cloudinary_service.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
-  // ========== Storage Operations ==========
 
-  /// Upload image to Firebase Storage
-  Future<String> uploadImage(File imageFile, String folder) async {
-    try {
-      final String fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
-      final Reference ref = _storage.ref().child('$folder/$fileName');
-
-      final UploadTask uploadTask = ref.putFile(imageFile);
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-
-      return downloadUrl;
-    } catch (e) {
-      throw Exception('Failed to upload image: $e');
-    }
-  }
-
-  /// Upload multiple images
-  Future<List<String>> uploadMultipleImages(
-      List<File> imageFiles, String folder) async {
-    final List<String> downloadUrls = [];
-
-    for (final imageFile in imageFiles) {
-      final url = await uploadImage(imageFile, folder);
-      downloadUrls.add(url);
-    }
-
-    return downloadUrls;
-  }
-
-  /// Delete image from Firebase Storage
-  Future<void> deleteImage(String imageUrl) async {
-    try {
-      final Reference ref = _storage.refFromURL(imageUrl);
-      await ref.delete();
-    } catch (e) {
-      print('Failed to delete image: $e');
-    }
-  }
 
   // ========== Rental Item Operations ==========
 
@@ -130,12 +88,11 @@ class FirestoreService {
   /// Delete rental item
   Future<void> deleteRentalItem(String id) async {
     try {
-      // Get item to delete images
+      // Get item to delete images from Cloudinary
       final item = await getRentalItem(id);
       if (item != null) {
-        // Delete images from storage
         for (final imageUrl in item.imageUrls) {
-          await deleteImage(imageUrl);
+          await _cloudinaryService.deleteImage(imageUrl);
         }
       }
 
@@ -326,6 +283,13 @@ class FirestoreService {
       for (final doc in existingChats.docs) {
         final chat = ChatModel.fromFirestore(doc);
         if (chat.participants.contains(userId2)) {
+          // If this is an old chat missing rental info, patch it!
+          if (rentalItemId != null && chat.rentalItemId == null) {
+            await _firestore.collection('chats').doc(doc.id).update({
+              'rentalItemId': rentalItemId,
+              'rentalItemName': rentalItemName,
+            });
+          }
           return doc.id;
         }
       }
@@ -361,6 +325,18 @@ class FirestoreService {
   }
 
   // ========== Contract Operations ==========
+
+  /// Update the status of a contract message
+  Future<void> updateMessageContractStatus(String chatId, String messageId, String status) async {
+    try {
+      await _firestore
+          .collection('messages')
+          .doc(messageId)
+          .update({'contractStatus': status});
+    } catch (e) {
+      throw Exception('Failed to update contract status: $e');
+    }
+  }
 
   /// Create rental contract
   Future<String> createContract(RentalContractModel contract) async {
