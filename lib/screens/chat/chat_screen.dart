@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/cloudinary_service.dart';
 import '../../models/chat_message_model.dart';
+import '../../models/rental_item_model.dart';
+import '../rentals/item_detail_screen.dart';
+import 'create_contract_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
   final String otherUserId;
   final String otherUserName;
   final String? rentalItemName;
+  final String? rentalItemId;
 
   const ChatScreen({
     super.key,
@@ -20,6 +26,7 @@ class ChatScreen extends StatefulWidget {
     required this.otherUserId,
     required this.otherUserName,
     this.rentalItemName,
+    this.rentalItemId,
   });
 
   @override
@@ -95,8 +102,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final firestoreService = FirestoreService();
 
-      // Upload image to Firebase Storage
-      final imageUrl = await firestoreService.uploadImage(
+      // Upload image to Cloudinary
+      final cloudinaryService = CloudinaryService();
+      final imageUrl = await cloudinaryService.uploadImage(
         File(image.path),
         'chat_images',
       );
@@ -242,14 +250,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
+          
             child: Row(
               children: [
                 IconButton(
                   icon: Icon(
-                    Icons.image_outlined,
+                    Icons.add_circle_outline,
                     color: AppTheme.primaryTeal,
                   ),
-                  onPressed: _isSending ? null : _pickImage,
+                  onPressed: _isSending ? null : () => _showAttachmentMenu(context),
                 ),
                 Expanded(
                   child: TextField(
@@ -293,14 +302,100 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
               ],
-            ),
+          ),
           ),
         ],
       ),
     );
   }
 
+  void _showAttachmentMenu(BuildContext context) async {
+    final currentUserId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+    bool isOwner = false;
+    RentalItemModel? currentItem;
+
+    if (widget.rentalItemId != null) {
+      currentItem = await FirestoreService().getRentalItem(widget.rentalItemId!);
+      if (currentItem != null && currentItem.ownerId == currentUserId) {
+        isOwner = true;
+      }
+    }
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
+                  child: Icon(Icons.image, color: AppTheme.primaryTeal),
+                ),
+                title: const Text('ส่งรูปภาพ'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage();
+                },
+              ),
+              if (isOwner)
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
+                    child: Icon(Icons.description, color: AppTheme.primaryTeal),
+                  ),
+                  title: const Text('สร้างสัญญาเช่า'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (currentItem != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreateContractScreen(
+                            chatId: widget.chatId,
+                            rentalItem: currentItem!,
+                            otherUserId: widget.otherUserId,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildMessageBubble(ChatMessageModel message, bool isMe) {
+    // Item card message — rendered differently
+    if (message.messageType == 'item_card') {
+      return _buildItemCardMessage(message, isMe);
+    }
+
+    // Contract message
+    if (message.messageType == 'contract') {
+      return _buildContractMessage(message, isMe);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -397,6 +492,394 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  /// Renders a tappable listing card bubble
+  Widget _buildItemCardMessage(ChatMessageModel message, bool isMe) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.secondaryGreen,
+              child: Text(
+                widget.otherUserName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                // Label above card
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    isMe ? 'คุณแชร์สิ่งนี้' : 'ได้รับคำขอเช่าสิ่งนี้',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ),
+
+                // Tappable card
+                GestureDetector(
+                  onTap: () => _openItemDetail(message),
+                  child: Container(
+                    width: 240,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      border: Border.all(
+                          color: AppTheme.primaryTeal.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Item image
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16)),
+                          child: message.itemImageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: message.itemImageUrl!,
+                                  height: 140,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    height: 140,
+                                    color: AppTheme.backgroundColor,
+                                    child: Icon(Icons.image_outlined,
+                                        color: AppTheme.textHint, size: 40),
+                                  ),
+                                )
+                              : Container(
+                                  height: 140,
+                                  color: AppTheme.backgroundColor,
+                                  child: Center(
+                                    child: Icon(Icons.inventory_2_outlined,
+                                        color: AppTheme.textHint, size: 40),
+                                  ),
+                                ),
+                        ),
+                        // Item info
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                message.itemName ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              if (message.itemPrice != null)
+                                Text(
+                                  '฿${message.itemPrice!.toStringAsFixed(0)} / วัน',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryTeal,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'ดูรายละเอียด ›',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryTeal,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTime(message.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textHint,
+                        fontSize: 11,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openItemDetail(ChatMessageModel message) async {
+    if (message.itemId == null) return;
+    final firestoreService = FirestoreService();
+    try {
+      final item = await firestoreService.getRentalItem(message.itemId!);
+      if (item != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ItemDetailScreen(item: item),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ไม่สามารถโหลดรายละเอียดได้: $e')),
+        );
+      }
+    }
+  }
+
+  /// Renders the contract message bubble
+  Widget _buildContractMessage(ChatMessageModel message, bool isMe) {
+    final contractData = message.contractData ?? {};
+    final status = message.contractStatus ?? 'pending';
+
+    // Format dates safely
+    String dateRange = 'ไม่ระบุวันที่';
+    if (contractData['startDate'] != null && contractData['endDate'] != null) {
+      try {
+        final start = DateTime.parse(contractData['startDate']);
+        final end = DateTime.parse(contractData['endDate']);
+        dateRange = '${DateFormat('dd/MM/yyyy').format(start)} - ${DateFormat('dd/MM/yyyy').format(end)}';
+      } catch (_) {}
+    }
+
+    final price = contractData['totalPrice']?.toString() ?? '0';
+    final deposit = contractData['deposit']?.toString() ?? '0';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.secondaryGreen,
+              child: Text(
+                widget.otherUserName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    isMe ? 'คุณส่งสัญญาเช่า' : 'ส่งสัญญาเช่ามาให้คุณ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 260,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.primaryTeal, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryTeal.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Header
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryTeal,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.description_outlined, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'สัญญาเช่า',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            if (status != 'pending')
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  status == 'accepted' ? 'ยอมรับแล้ว' : 'ปฏิเสธแล้ว',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: status == 'accepted' ? Colors.green : Colors.red,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Details
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              contractData['rentalItemName'] ?? 'ไม่ระบุชื่อสิ่งของ',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildContractRow('ระยะเวลา', dateRange),
+                            const SizedBox(height: 8),
+                            _buildContractRow('ค่าเช่ารวม', '฿$price'),
+                            const SizedBox(height: 8),
+                            _buildContractRow('ค่ามัดจำ', '฿$deposit'),
+                            
+                            if (contractData['rules'] != null && contractData['rules'].toString().isNotEmpty) ...[
+                              const Divider(height: 24),
+                              Text('เงื่อนไขเพิ่มเติม:', style: TextStyle(fontSize: 12, color: AppTheme.textHint)),
+                              const SizedBox(height: 4),
+                              Text(
+                                contractData['rules'],
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ]
+                          ],
+                        ),
+                      ),
+                      
+                      // Action Buttons (Only if pending AND is NOT me/the owner)
+                      if (status == 'pending' && !isMe)
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => _updateContractStatus(message, 'declined'),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    foregroundColor: Colors.red,
+                                  ),
+                                  child: const Text('ปฏิเสธ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                              Container(width: 1, height: 40, color: Colors.grey.shade200),
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => _updateContractStatus(message, 'accepted'),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    foregroundColor: AppTheme.primaryTeal,
+                                  ),
+                                  child: const Text('ยอมรับ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTime(message.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textHint,
+                        fontSize: 11,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContractRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(label, style: TextStyle(color: AppTheme.textHint, fontSize: 13)),
+        ),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _updateContractStatus(ChatMessageModel message, String newStatus) async {
+    try {
+      await FirestoreService().updateMessageContractStatus(
+        widget.chatId,
+        message.id,
+        newStatus,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildDateDivider(DateTime date) {
