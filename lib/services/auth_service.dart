@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -96,9 +98,59 @@ class AuthService {
     }
   }
 
-  // Sign out
+  // Sign out (Firebase + Google)
   Future<void> signOut() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
+  }
+
+  // Sign in with Google (enforces @ku.th)
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null; // user cancelled
+
+      // Enforce KU email
+      if (!googleUser.email.endsWith('@ku.th')) {
+        await _googleSignIn.signOut();
+        throw Exception('กรุณาใช้บัญชี Google @ku.th เท่านั้น');
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        // Create or update Firestore doc
+        final docRef = _firestore.collection('users').doc(user.uid);
+        final doc = await docRef.get();
+        if (!doc.exists) {
+          final userModel = UserModel(
+            uid: user.uid,
+            email: user.email ?? '',
+            name: user.displayName ?? '',
+            photoUrl: user.photoURL,
+            createdAt: DateTime.now(),
+          );
+          await docRef.set(userModel.toFirestore());
+        } else {
+          // Update photoUrl if it changed
+          await docRef.update({'photoUrl': user.photoURL});
+        }
+      }
+
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      throw Exception('Google Sign-In ล้มเหลว: ${e.message}');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // Get user data from Firestore
