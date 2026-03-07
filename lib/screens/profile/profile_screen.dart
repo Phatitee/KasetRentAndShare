@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/user_model.dart';
 import '../auth/login_screen.dart';
+import 'rental_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -38,6 +40,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  /// ดึงชื่อจริงจาก KU email format: chaimongkhon.na@ku.th → Chaimongkhon
+  String _getFirstNameFromEmail(String? email) {
+    if (email == null || email.isEmpty) return 'User';
+    final localPart = email.split('@').first; // chaimongkhon.na
+    final firstName = localPart.split('.').first; // chaimongkhon
+    if (firstName.isEmpty) return 'User';
+    return firstName[0].toUpperCase() + firstName.substring(1);
   }
 
   Future<void> _handleLogout() async {
@@ -147,20 +158,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          // Avatar
+          // Avatar — show Google photo if available, otherwise initial letter
           Stack(
             children: [
               CircleAvatar(
                 radius: 48,
                 backgroundColor: AppTheme.primaryTeal,
-                child: Text(
-                  _user?.name.substring(0, 1).toUpperCase() ?? 'U',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _user?.photoUrl != null
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: _user!.photoUrl!,
+                          width: 96,
+                          height: 96,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Text(
+                            _getFirstNameFromEmail(_user?.email)
+                                .substring(0, 1)
+                                .toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => Text(
+                            _getFirstNameFromEmail(_user?.email)
+                                .substring(0, 1)
+                                .toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _getFirstNameFromEmail(_user?.email)
+                            .substring(0, 1)
+                            .toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
               if (_user?.isVerified == true)
                 Positioned(
@@ -183,9 +225,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Name
+          // First name from email
           Text(
-            _user?.name ?? 'Unknown',
+            _getFirstNameFromEmail(_user?.email),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -246,6 +288,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatsSection() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final firestoreService = FirestoreService();
     return Row(
       children: [
         Expanded(
@@ -257,10 +301,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _buildStatCard(
-            'Items Listed',
-            '0', // TODO: Get from Firestore
-            Icons.inventory_2_outlined,
+          child: FutureBuilder<List<dynamic>>(
+            future: firestoreService
+                .getUserRentalItems(authService.currentUser!.uid)
+                .first,
+            builder: (context, snapshot) {
+              final count = snapshot.data?.length ?? 0;
+              return _buildStatCard(
+                'Items Listed',
+                '$count',
+                Icons.inventory_2_outlined,
+              );
+            },
           ),
         ),
       ],
@@ -323,23 +375,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.history,
             title: 'Rental History',
             onTap: () {
-              // TODO: Navigate to rental history
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RentalHistoryScreen(),
+                ),
+              );
             },
           ),
           const Divider(height: 1),
           _buildMenuItem(
             icon: Icons.edit,
             title: 'Edit Profile',
-            onTap: () {
-              // TODO: Navigate to edit profile
-            },
+            onTap: () => _showEditProfileDialog(),
           ),
           const Divider(height: 1),
           _buildMenuItem(
             icon: Icons.notifications_outlined,
             title: 'Notifications',
             onTap: () {
-              // TODO: Navigate to notification settings
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('ระบบแจ้งเตือนจะเปิดใช้ได้ในเร็วๆ นี้'),
+                ),
+              );
             },
           ),
           const Divider(height: 1),
@@ -347,7 +405,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.help_outline,
             title: 'Help & Support',
             onTap: () {
-              // TODO: Show help
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Help & Support'),
+                  content: const Text('ติดต่อผู้ดูแลระบบ:\nkasetrentshare@ku.th\n\nเวลาทำการ: จันทร์-ศุกร์ 9:00-17:00 น.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('ตกลง'),
+                    ),
+                  ],
+                ),
+              );
             },
           ),
           const Divider(height: 1),
@@ -378,6 +448,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
       onTap: onTap,
+    );
+  }
+
+  Future<void> _showEditProfileDialog() async {
+    final nameController = TextEditingController(text: _user?.name ?? '');
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('แก้ไขโปรไฟล์'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อ-นามสกุล',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isEmpty) return;
+              Navigator.pop(context);
+              try {
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+                await authService.updateUserData(
+                  authService.currentUser!.uid,
+                  {'name': newName},
+                );
+                // Reload profile
+                await _loadUserData();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('อัปเดตโปรไฟล์สำเร็จ'),
+                      backgroundColor: AppTheme.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('เกิดข้อผิดพลาด: $e'),
+                      backgroundColor: AppTheme.error,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
     );
   }
 }
