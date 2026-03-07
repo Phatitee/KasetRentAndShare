@@ -4,12 +4,14 @@ import '../../../config/theme.dart';
 class CategoryButton extends StatelessWidget {
   final IconData icon;
   final String label;
+  final bool isSelected;
   final VoidCallback onTap;
 
   const CategoryButton({
     super.key,
     required this.icon,
     required this.label,
+    this.isSelected = false,
     required this.onTap,
   });
 
@@ -24,12 +26,14 @@ class CategoryButton extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: AppTheme.primaryTeal.withOpacity(0.1),
+              color: isSelected
+                  ? AppTheme.primaryTeal
+                  : AppTheme.primaryTeal.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: AppTheme.primaryTeal,
+              color: isSelected ? Colors.white : AppTheme.primaryTeal,
               size: 32,
             ),
           ),
@@ -38,6 +42,7 @@ class CategoryButton extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: isSelected ? AppTheme.primaryTeal : null,
                 ),
           ),
         ],
@@ -45,3 +50,4 @@ class CategoryButton extends StatelessWidget {
     );
   }
 }
+
