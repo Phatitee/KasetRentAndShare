@@ -9,6 +9,17 @@ class ChatMessageModel {
   final DateTime timestamp;
   final bool isRead;
 
+  // Item card fields
+  final String messageType; // 'text' | 'image' | 'item_card' | 'contract'
+  final String? itemId;
+  final String? itemName;
+  final String? itemImageUrl;
+  final double? itemPrice;
+
+  // Contract specific fields
+  final Map<String, dynamic>? contractData;
+  final String? contractStatus; // 'pending' | 'accepted' | 'declined'
+
   ChatMessageModel({
     required this.id,
     required this.chatId,
@@ -17,6 +28,13 @@ class ChatMessageModel {
     this.imageUrl,
     required this.timestamp,
     this.isRead = false,
+    this.messageType = 'text',
+    this.itemId,
+    this.itemName,
+    this.itemImageUrl,
+    this.itemPrice,
+    this.contractData,
+    this.contractStatus,
   });
 
   factory ChatMessageModel.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +47,15 @@ class ChatMessageModel {
       imageUrl: data['imageUrl'],
       timestamp: (data['timestamp'] as Timestamp).toDate(),
       isRead: data['isRead'] ?? false,
+      messageType: data['messageType'] ?? 'text',
+      itemId: data['itemId'],
+      itemName: data['itemName'],
+      itemImageUrl: data['itemImageUrl'],
+      itemPrice: data['itemPrice'] != null
+          ? (data['itemPrice'] as num).toDouble()
+          : null,
+      contractData: data['contractData'] != null ? Map<String, dynamic>.from(data['contractData']) : null,
+      contractStatus: data['contractStatus'],
     );
   }
 
@@ -40,6 +67,13 @@ class ChatMessageModel {
       'imageUrl': imageUrl,
       'timestamp': Timestamp.fromDate(timestamp),
       'isRead': isRead,
+      'messageType': messageType,
+      'itemId': itemId,
+      'itemName': itemName,
+      'itemImageUrl': itemImageUrl,
+      'itemPrice': itemPrice,
+      'contractData': contractData,
+      'contractStatus': contractStatus,
     };
   }
 }
