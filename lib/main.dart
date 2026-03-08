@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'config/theme.dart';
+import 'config/locale_provider.dart';
 import 'services/auth_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -28,12 +29,22 @@ class MyApp extends StatelessWidget {
         Provider<AuthService>(
           create: (_) => AuthService(),
         ),
+        ChangeNotifierProvider<LocaleProvider>(
+          create: (_) => LocaleProvider(),
+        ),
       ],
-      child: MaterialApp(
-        title: 'Kaset RentShare',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const AuthWrapper(),
+      child: Consumer<LocaleProvider>(
+        builder: (context, localeProvider, _) {
+          return LocalizationsWrapper(
+            locale: localeProvider.locale,
+            child: MaterialApp(
+              title: 'Kaset RentShare',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              home: const AuthWrapper(),
+            ),
+          );
+        },
       ),
     );
   }
