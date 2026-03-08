@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/rental_item_model.dart';
@@ -11,6 +12,7 @@ import 'widgets/request_card.dart';
 import '../rentals/post_rental_screen.dart';
 import '../rentals/post_request_screen.dart';
 import '../rentals/item_detail_screen.dart';
+import '../rentals/request_details_screen.dart';
 import 'package:provider/provider.dart';
 
 /// A wrapper class to hold either a rental item or request in the feed
@@ -43,9 +45,18 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final FirestoreService _firestoreService = FirestoreService();
   String _selectedCategory = '';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -86,7 +97,7 @@ class _HomeTabState extends State<HomeTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Kaset RentShare',
+                      l.tr('home_title'),
                       style: Theme.of(context).textTheme.displayMedium?.copyWith(
                             color: AppTheme.primaryTeal,
                             fontWeight: FontWeight.bold,
@@ -94,7 +105,7 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Safe rentals for KU students',
+                      l.tr('home_subtitle'),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textSecondary,
                           ),
@@ -110,9 +121,22 @@ class _HomeTabState extends State<HomeTab> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() => _searchQuery = value.trim().toLowerCase());
+                  },
                   decoration: InputDecoration(
-                    hintText: 'Find cameras, textbooks...',
+                    hintText: l.tr('home_search_hint'),
                     prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
                     filled: true,
                     fillColor: AppTheme.backgroundColor,
                     border: OutlineInputBorder(
@@ -133,8 +157,8 @@ class _HomeTabState extends State<HomeTab> {
                   children: [
                     Expanded(
                       child: _ActionButton(
-                        title: 'Post Item',
-                        subtitle: 'Earn from your gear',
+                        title: l.tr('home_post_item'),
+                        subtitle: l.tr('home_post_item_sub'),
                         icon: Icons.add_circle_outline,
                         color: AppTheme.primaryTeal,
                         onTap: () {
@@ -149,8 +173,8 @@ class _HomeTabState extends State<HomeTab> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _ActionButton(
-                        title: 'Request',
-                        subtitle: 'Find what you need',
+                        title: l.tr('home_request'),
+                        subtitle: l.tr('home_request_sub'),
                         icon: Icons.search,
                         color: AppTheme.accentMint,
                         textColor: AppTheme.primaryTeal,
@@ -177,40 +201,25 @@ class _HomeTabState extends State<HomeTab> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Categories',
+                      l.tr('home_categories'),
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 100,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       children: [
-                        CategoryButton(
-                          icon: Icons.camera_alt,
-                          label: 'Camera',
-                          isSelected: _selectedCategory == 'Camera',
-                          onTap: () => _filterCategory('Camera'),
-                        ),
-                        CategoryButton(
-                          icon: Icons.laptop,
-                          label: 'Electronics',
-                          isSelected: _selectedCategory == 'Electronics',
-                          onTap: () => _filterCategory('Electronics'),
-                        ),
-                        CategoryButton(
-                          icon: Icons.checkroom,
-                          label: 'Fashion',
-                          isSelected: _selectedCategory == 'Fashion',
-                          onTap: () => _filterCategory('Fashion'),
-                        ),
-                        CategoryButton(
-                          icon: Icons.menu_book,
-                          label: 'Books',
-                          isSelected: _selectedCategory == 'Books',
-                          onTap: () => _filterCategory('Books'),
-                        ),
+                        _buildCategoryChip(l.tr('cat_all'), Icons.apps, '', l),
+                        _buildCategoryChip(l.tr('cat_camera'), Icons.camera_alt, 'Camera', l),
+                        _buildCategoryChip(l.tr('cat_electronics'), Icons.laptop, 'Electronics', l),
+                        _buildCategoryChip(l.tr('cat_fashion'), Icons.checkroom, 'Fashion', l),
+                        _buildCategoryChip(l.tr('cat_books'), Icons.menu_book, 'Books', l),
+                        _buildCategoryChip(l.tr('cat_sports'), Icons.sports_basketball, 'Sports', l),
+                        _buildCategoryChip(l.tr('cat_music'), Icons.music_note, 'Music', l),
+                        _buildCategoryChip(l.tr('cat_others'), Icons.category, 'Others', l),
                       ],
                     ),
                   ),
@@ -227,7 +236,7 @@ class _HomeTabState extends State<HomeTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _selectedCategory.isEmpty ? 'Feed' : _selectedCategory,
+                      _selectedCategory.isEmpty ? l.tr('home_feed') : _selectedCategory,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     if (_selectedCategory.isNotEmpty)
@@ -236,7 +245,7 @@ class _HomeTabState extends State<HomeTab> {
                           setState(() => _selectedCategory = '');
                         },
                         child: Text(
-                          'Clear Filter',
+                          l.tr('home_clear_filter'),
                           style: TextStyle(
                             color: AppTheme.primaryTeal,
                             fontWeight: FontWeight.w600,
@@ -313,7 +322,7 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No posts yet',
+                          AppLocalizations.of(context).tr('home_no_posts'),
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
@@ -321,7 +330,7 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Be the first to post or request an item!',
+                          AppLocalizations.of(context).tr('home_be_first'),
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
@@ -334,12 +343,24 @@ class _HomeTabState extends State<HomeTab> {
               );
             }
 
+            // Apply search filter
+            final filteredItems = _searchQuery.isEmpty
+                ? feedItems
+                : feedItems.where((fi) {
+                    if (fi.isRentalItem) {
+                      return fi.rentalItem!.itemName.toLowerCase().contains(_searchQuery) ||
+                          fi.rentalItem!.description.toLowerCase().contains(_searchQuery);
+                    } else {
+                      return fi.rentalRequest!.itemDescription.toLowerCase().contains(_searchQuery);
+                    }
+                  }).toList();
+
             return SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final feedItem = feedItems[index];
+                    final feedItem = filteredItems[index];
 
                     if (feedItem.isRentalItem) {
                       final item = feedItem.rentalItem!;
@@ -351,7 +372,7 @@ class _HomeTabState extends State<HomeTab> {
                               : null,
                           itemName: item.itemName,
                           pricePerDay: item.dailyRate,
-                          ownerName: 'Owner',
+                          ownerName: AppLocalizations.of(context).tr('owner'),
                           ownerRating: 5.0,
                           isVerified: false,
                           onTap: () {
@@ -375,15 +396,19 @@ class _HomeTabState extends State<HomeTab> {
                           startDate: request.startDate,
                           endDate: request.endDate,
                           locationName: request.locationName,
-                          requesterName: 'Requester',
+                          requesterName: AppLocalizations.of(context).tr('requester'),
                           onTap: () {
-                            // TODO: Navigate to request detail
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => RequestDetailsScreen(request: request),
+                              ),
+                            );
                           },
                         ),
                       );
                     }
                   },
-                  childCount: feedItems.length,
+                  childCount: filteredItems.length,
                 ),
               ),
             );
@@ -393,10 +418,28 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  Widget _buildCategoryChip(String label, IconData icon, String categoryKey, AppLocalizations l) {
+    final isSelected = categoryKey.isEmpty
+        ? _selectedCategory.isEmpty
+        : _selectedCategory == categoryKey;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: CategoryButton(
+        icon: icon,
+        label: label,
+        isSelected: isSelected,
+        onTap: () => _filterCategory(categoryKey),
+      ),
+    );
+  }
+
   void _filterCategory(String category) {
     setState(() {
-      _selectedCategory =
-          _selectedCategory == category ? '' : category;
+      if (category.isEmpty || _selectedCategory == category) {
+        _selectedCategory = '';
+      } else {
+        _selectedCategory = category;
+      }
     });
   }
 }
