@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/chat_message_model.dart';
@@ -12,12 +13,13 @@ class ChatListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final authService = Provider.of<AuthService>(context, listen: false);
     final currentUserId = authService.currentUser!.uid;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Messages'),
+        title: Text(l.tr('chat_title')),
         automaticallyImplyLeading: false,
       ),
       body: StreamBuilder<List<ChatModel>>(
@@ -28,7 +30,7 @@ class ChatListScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('${l.tr('error')}: ${snapshot.error}'));
           }
 
           final chats = snapshot.data ?? [];
@@ -45,14 +47,14 @@ class ChatListScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No conversations yet',
+                    l.tr('no_chats'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppTheme.textSecondary,
                         ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start chatting with renters!',
+                    l.tr('no_chats_sub'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textHint,
                         ),
@@ -94,6 +96,8 @@ class _ChatListItem extends StatelessWidget {
       (id) => id != currentUserId,
       orElse: () => '',
     );
+    final unreadCount = chat.getUnreadFor(currentUserId);
+    final hasUnread = unreadCount > 0;
 
     return FutureBuilder(
       future: FirestoreService().getUserData(otherUserId),
@@ -103,6 +107,8 @@ class _ChatListItem extends StatelessWidget {
 
         return ListTile(
           onTap: () {
+            // Mark as read when opening
+            FirestoreService().markChatAsRead(chat.id, currentUserId);
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -118,7 +124,9 @@ class _ChatListItem extends StatelessWidget {
           },
           leading: CircleAvatar(
             radius: 28,
-            backgroundColor: AppTheme.primaryTeal,
+            backgroundColor: hasUnread
+                ? AppTheme.primaryTeal
+                : AppTheme.primaryTeal.withOpacity(0.7),
             child: Text(
               otherUserName.isNotEmpty 
                   ? otherUserName.substring(0, 1).toUpperCase() 
@@ -135,7 +143,9 @@ class _ChatListItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   otherUserName,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                      ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -144,7 +154,8 @@ class _ChatListItem extends StatelessWidget {
                 Text(
                   _formatTime(chat.lastMessageTime!),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: hasUnread ? AppTheme.primaryTeal : AppTheme.textSecondary,
+                        fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
                       ),
                 ),
             ],
@@ -164,13 +175,38 @@ class _ChatListItem extends StatelessWidget {
                 ),
               ],
               if (chat.lastMessage != null)
-                Text(
-                  chat.lastMessage!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        chat.lastMessage!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: hasUnread ? AppTheme.textPrimary : AppTheme.textSecondary,
+                              fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                    ),
+                    if (hasUnread) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryTeal,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
             ],
           ),
