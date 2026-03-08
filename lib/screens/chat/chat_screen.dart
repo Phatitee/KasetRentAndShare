@@ -5,12 +5,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/cloudinary_service.dart';
 import '../../models/chat_message_model.dart';
 import '../../models/rental_item_model.dart';
+import '../../models/rental_request_model.dart';
 import '../rentals/item_detail_screen.dart';
+import '../rentals/request_details_screen.dart';
 import 'create_contract_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -37,6 +40,19 @@ class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _markAsRead();
+  }
+
+  void _markAsRead() {
+    final currentUserId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+    if (currentUserId != null) {
+      FirestoreService().markChatAsRead(widget.chatId, currentUserId);
+    }
+  }
 
   @override
   void dispose() {
@@ -310,15 +326,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showAttachmentMenu(BuildContext context) async {
-    final currentUserId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
-    bool isOwner = false;
+    final l = AppLocalizations.of(context);
     RentalItemModel? currentItem;
 
     if (widget.rentalItemId != null) {
       currentItem = await FirestoreService().getRentalItem(widget.rentalItemId!);
-      if (currentItem != null && currentItem.ownerId == currentUserId) {
-        isOwner = true;
-      }
     }
 
     if (!context.mounted) return;
@@ -348,35 +360,32 @@ class _ChatScreenState extends State<ChatScreen> {
                   backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
                   child: Icon(Icons.image, color: AppTheme.primaryTeal),
                 ),
-                title: const Text('ส่งรูปภาพ'),
+                title: Text(l.tr('send_image')),
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage();
                 },
               ),
-              if (isOwner)
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
-                    child: Icon(Icons.description, color: AppTheme.primaryTeal),
-                  ),
-                  title: const Text('สร้างสัญญาเช่า'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentItem != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CreateContractScreen(
-                            chatId: widget.chatId,
-                            rentalItem: currentItem!,
-                            otherUserId: widget.otherUserId,
-                          ),
-                        ),
-                      );
-                    }
-                  },
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
+                  child: Icon(Icons.description, color: AppTheme.primaryTeal),
                 ),
+                title: Text(l.tr('create_contract')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateContractScreen(
+                        chatId: widget.chatId,
+                        rentalItem: currentItem,
+                        otherUserId: widget.otherUserId,
+                      ),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
             ],
           ),
@@ -389,6 +398,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // Item card message — rendered differently
     if (message.messageType == 'item_card') {
       return _buildItemCardMessage(message, isMe);
+    }
+
+    // Request card message
+    if (message.messageType == 'request_card') {
+      return _buildRequestCardMessage(message, isMe);
     }
 
     // Contract message
@@ -652,6 +666,181 @@ class _ChatScreenState extends State<ChatScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ItemDetailScreen(item: item),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ไม่สามารถโหลดรายละเอียดได้: $e')),
+        );
+      }
+    }
+  }
+
+  /// Renders a request card bubble (from rental request posts)
+  Widget _buildRequestCardMessage(ChatMessageModel message, bool isMe) {
+    final l = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.secondaryGreen,
+              child: Text(
+                widget.otherUserName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    isMe ? l.tr('from_request') : l.tr('looking_for_rent'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _openRequestDetail(message),
+                  child: Container(
+                    width: 240,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      border: Border.all(
+                          color: AppTheme.accentMint, width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header badge
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentMint.withOpacity(0.3),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(14)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.search,
+                                  size: 16, color: AppTheme.primaryTeal),
+                              const SizedBox(width: 6),
+                              Text(
+                                l.tr('looking_to_rent'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryTeal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Request info
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                message.requestDescription ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              if (message.requestBudget != null)
+                                Row(
+                                  children: [
+                                    Icon(Icons.payments_outlined,
+                                        size: 16, color: AppTheme.primaryTeal),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${l.tr('budget_label')}: ฿${message.requestBudget!.toStringAsFixed(0)}${l.tr('per_day')}',
+                                      style: TextStyle(
+                                        color: AppTheme.primaryTeal,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    l.tr('view_details'),
+                                    style: TextStyle(
+                                      color: AppTheme.primaryTeal,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTime(message.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textHint,
+                        fontSize: 11,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openRequestDetail(ChatMessageModel message) async {
+    if (message.requestId == null) return;
+    final firestoreService = FirestoreService();
+    try {
+      final request = await firestoreService.getRentalRequest(message.requestId!);
+      if (request != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RequestDetailsScreen(request: request),
           ),
         );
       }
