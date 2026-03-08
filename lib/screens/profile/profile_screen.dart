@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/user_model.dart';
 import '../auth/login_screen.dart';
+import '../reviews/user_reviews_screen.dart';
+import '../contracts/contracts_list_screen.dart';
 import 'rental_history_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -52,22 +56,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleLogout() async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text(l.tr('logout')),
+        content: Text(l.tr('logout_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.error,
             ),
-            child: const Text('Logout'),
+            child: Text(l.tr('logout')),
           ),
         ],
       ),
@@ -87,6 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -95,12 +101,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text(l.tr('profile_title')),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
-              // TODO: Navigate to settings
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
             },
           ),
         ],
@@ -126,9 +134,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             OutlinedButton.icon(
               onPressed: _handleLogout,
               icon: const Icon(Icons.logout, color: AppTheme.error),
-              label: const Text(
-                'Logout',
-                style: TextStyle(color: AppTheme.error),
+              label: Text(
+                l.tr('logout'),
+                style: const TextStyle(color: AppTheme.error),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppTheme.error),
@@ -357,6 +365,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMenuSection() {
+    final l = AppLocalizations.of(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -373,7 +383,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildMenuItem(
             icon: Icons.history,
-            title: 'Rental History',
+            title: l.tr('rental_history'),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -384,18 +394,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const Divider(height: 1),
           _buildMenuItem(
+            icon: Icons.star_outline,
+            title: l.tr('my_reviews'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => UserReviewsScreen(
+                    userId: authService.currentUser!.uid,
+                    userName: _user?.name ?? 'User',
+                  ),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            icon: Icons.description_outlined,
+            title: l.tr('my_contracts'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ContractsListScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
             icon: Icons.edit,
-            title: 'Edit Profile',
+            title: l.tr('edit_profile'),
             onTap: () => _showEditProfileDialog(),
           ),
           const Divider(height: 1),
           _buildMenuItem(
             icon: Icons.notifications_outlined,
-            title: 'Notifications',
+            title: l.tr('notifications'),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('ระบบแจ้งเตือนจะเปิดใช้ได้ในเร็วๆ นี้'),
+                SnackBar(
+                  content: Text(l.tr('notification_coming_soon')),
                 ),
               );
             },
@@ -403,17 +440,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 1),
           _buildMenuItem(
             icon: Icons.help_outline,
-            title: 'Help & Support',
+            title: l.tr('help_support'),
             onTap: () {
               showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
-                  title: const Text('Help & Support'),
-                  content: const Text('ติดต่อผู้ดูแลระบบ:\nkasetrentshare@ku.th\n\nเวลาทำการ: จันทร์-ศุกร์ 9:00-17:00 น.'),
+                  title: Text(l.tr('help_title')),
+                  content: Text('${l.tr('help_contact')}\nkasetrentshare@ku.th\n\n${l.tr('help_hours')}'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('ตกลง'),
+                      child: Text(l.tr('ok')),
                     ),
                   ],
                 ),
@@ -423,7 +460,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 1),
           _buildMenuItem(
             icon: Icons.info_outline,
-            title: 'About',
+            title: l.tr('about'),
             onTap: () {
               showAboutDialog(
                 context: context,
@@ -452,19 +489,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showEditProfileDialog() async {
+    final l = AppLocalizations.of(context);
     final nameController = TextEditingController(text: _user?.name ?? '');
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('แก้ไขโปรไฟล์'),
+        title: Text(l.tr('edit_profile')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อ-นามสกุล',
-                prefixIcon: Icon(Icons.person_outline),
+              decoration: InputDecoration(
+                labelText: l.tr('name_label'),
+                prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
           ],
@@ -472,7 +510,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            child: Text(l.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -490,8 +528,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await _loadUserData();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('อัปเดตโปรไฟล์สำเร็จ'),
+                    SnackBar(
+                      content: Text(l.tr('profile_updated')),
                       backgroundColor: AppTheme.success,
                     ),
                   );
@@ -500,14 +538,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('เกิดข้อผิดพลาด: $e'),
+                      content: Text('${l.tr('error')}: $e'),
                       backgroundColor: AppTheme.error,
                     ),
                   );
                 }
               }
             },
-            child: const Text('บันทึก'),
+            child: Text(l.tr('save')),
           ),
         ],
       ),
