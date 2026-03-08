@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../models/rental_request_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
@@ -29,7 +30,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
   final List<String> _categories = [
     'Camera',
-    'Tech',
+    'Electronics',
     'Fashion',
     'Books',
     'Sports',
@@ -81,34 +82,36 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
       _pickupLocation = const GeoPoint(13.8462, 100.5713);
     });
 
+    final l = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Location set to Kasetsart University'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(l.tr('location_set')),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
   Future<void> _submitRequest() async {
+    final l = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCategory.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
+        SnackBar(content: Text(l.tr('select_category_required'))),
       );
       return;
     }
 
     if (_startDate == null || _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select rental dates')),
+        SnackBar(content: Text(l.tr('select_dates'))),
       );
       return;
     }
 
     if (_pickupLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please set pickup location')),
+        SnackBar(content: Text(l.tr('set_location_required'))),
       );
       return;
     }
@@ -137,8 +140,8 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request posted successfully!'),
+          SnackBar(
+            content: Text(l.tr('request_posted')),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -148,7 +151,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('${l.tr('error')}: $e'),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -162,9 +165,10 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Post Request'),
+        title: Text(l.tr('post_request_appbar')),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -177,18 +181,18 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
           children: [
             // What are you looking for?
             Text(
-              'What are you looking for?',
+              l.tr('what_looking_for'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _itemDescriptionController,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Sony A7III, Graduation Gown',
+              decoration: InputDecoration(
+                hintText: l.tr('what_looking_hint'),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please describe what you need';
+                  return l.tr('describe_need');
                 }
                 return null;
               },
@@ -197,7 +201,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
             // Category
             Text(
-              'Category',
+              l.tr('category'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -238,7 +242,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
             // Rental Duration
             Text(
-              'Rental Duration',
+              l.tr('rental_duration'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -246,7 +250,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
               children: [
                 Expanded(
                   child: _buildDateButton(
-                    label: 'Start Date',
+                    label: l.tr('start_date'),
                     date: _startDate,
                     onTap: _selectDateRange,
                   ),
@@ -254,7 +258,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildDateButton(
-                    label: 'End Date',
+                    label: l.tr('end_date'),
                     date: _endDate,
                     onTap: _selectDateRange,
                   ),
@@ -265,7 +269,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
             // Estimated Budget
             Text(
-              'Estimated Budget (฿)',
+              l.tr('estimated_budget'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -278,14 +282,14 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
                   Icons.currency_exchange,
                   color: AppTheme.primaryTeal,
                 ),
-                helperText: 'Per day price willing to pay',
+                helperText: l.tr('budget_per_day'),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter your budget';
+                  return l.tr('enter_budget');
                 }
                 if (double.tryParse(value) == null) {
-                  return 'Invalid number';
+                  return l.tr('invalid_number');
                 }
                 return null;
               },
@@ -294,7 +298,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
             // Pick-up Location
             Text(
-              'Pick-up Location',
+              l.tr('pickup_location'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -318,7 +322,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Set Location',
+                            l.tr('set_location'),
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   color: AppTheme.primaryTeal,
                                 ),
@@ -386,16 +390,15 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
 
             // Additional Details
             Text(
-              'Additional Details',
+              l.tr('additional_details'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _additionalDetailsController,
               maxLines: 4,
-              decoration: const InputDecoration(
-                hintText:
-                    'Describe the condition you need, specific model requirements, or any questions...',
+              decoration: InputDecoration(
+                hintText: l.tr('additional_details_hint'),
                 alignLabelWithHint: true,
               ),
             ),
@@ -408,7 +411,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
                 onPressed: _isLoading ? null : _submitRequest,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Post'),
+                    : Text(l.tr('post_btn')),
               ),
             ),
             const SizedBox(height: 32),
@@ -467,7 +470,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
     switch (category) {
       case 'Camera':
         return Icons.camera_alt;
-      case 'Tech':
+      case 'Electronics':
         return Icons.laptop;
       case 'Fashion':
         return Icons.checkroom;
