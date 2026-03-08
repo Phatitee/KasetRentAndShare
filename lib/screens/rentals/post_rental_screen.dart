@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/cloudinary_service.dart';
 import '../../services/firestore_service.dart';
@@ -53,9 +54,10 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
   }
 
   Future<void> _pickImages() async {
+    final l = AppLocalizations.of(context);
     if (_images.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 5 photos allowed')),
+        SnackBar(content: Text(l.tr('max_photos'))),
       );
       return;
     }
@@ -81,18 +83,19 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
   }
 
   Future<void> _submitRental() async {
+    final l = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCategory.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
+        SnackBar(content: Text(l.tr('select_category_required'))),
       );
       return;
     }
 
     if (_images.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one photo')),
+        SnackBar(content: Text(l.tr('add_photo_at_least'))),
       );
       return;
     }
@@ -128,8 +131,8 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rental posted successfully!'),
+          SnackBar(
+            content: Text(l.tr('rental_posted')),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -189,9 +192,10 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Post Rental'),
+        title: Text(l.tr('post_rental_title')),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -227,12 +231,12 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Add Photos (0/5)',
+                            '${l.tr('add_photos')} (${_images.length}/5)',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Clear photos increase trust',
+                            l.tr('clear_photos_trust'),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -304,18 +308,18 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
             // Item Name
             Text(
-              'Item Name',
+              l.tr('item_name'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _itemNameController,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Sony A7III Camera Body',
+              decoration: InputDecoration(
+                hintText: l.tr('item_name_hint'),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter item name';
+                  return l.tr('item_name_required');
                 }
                 return null;
               },
@@ -324,7 +328,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
             // Category
             Text(
-              'Category',
+              l.tr('category'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -341,7 +345,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                   children: [
                     Text(
                       _selectedCategory.isEmpty
-                          ? 'Select Category'
+                          ? l.tr('select_category')
                           : _selectedCategory,
                       style: TextStyle(
                         color: _selectedCategory.isEmpty
@@ -358,7 +362,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
             // Condition
             Text(
-              'Condition',
+              l.tr('condition_label'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -391,7 +395,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Daily Rate (฿)',
+                        l.tr('daily_rate'),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
@@ -403,10 +407,10 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Required';
+                            return l.tr('required');
                           }
                           if (double.tryParse(value) == null) {
-                            return 'Invalid';
+                            return l.tr('invalid');
                           }
                           return null;
                         },
@@ -420,7 +424,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Deposit (฿)',
+                        l.tr('deposit_label'),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
@@ -432,10 +436,10 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Required';
+                            return l.tr('required');
                           }
                           if (double.tryParse(value) == null) {
-                            return 'Invalid';
+                            return l.tr('invalid');
                           }
                           return null;
                         },
@@ -449,20 +453,20 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
             // Description & Rules
             Text(
-              'Description & Rules',
+              l.tr('desc_and_rules'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _descriptionController,
               maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: 'Tell renters about your item and any specific rules for care...',
+              decoration: InputDecoration(
+                hintText: l.tr('desc_hint'),
                 alignLabelWithHint: true,
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a description';
+                  return l.tr('desc_required');
                 }
                 return null;
               },
@@ -476,7 +480,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                 onPressed: _isLoading ? null : _submitRental,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Post'),
+                    : Text(l.tr('post_btn')),
               ),
             ),
             const SizedBox(height: 32),
