@@ -3,11 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../models/rental_request_model.dart';
 import '../../models/offer_model.dart';
 import '../../models/user_model.dart';
+import '../../models/chat_message_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
+import '../chat/chat_screen.dart';
 
 class RequestDetailsScreen extends StatefulWidget {
   final RentalRequestModel request;
@@ -143,6 +146,24 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
           const SizedBox(height: 32),
         ],
       ),
+      bottomNavigationBar: !isRequestOwner
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton.icon(
+                  onPressed: () => _navigateToChat(),
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: Text(AppLocalizations.of(context).tr('offer_via_chat')),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -591,11 +612,9 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: Navigate to chat
-                },
+                onPressed: () => _navigateToChatWithUser(offer.offererId, offer.offererName),
                 icon: const Icon(Icons.reply, size: 18),
-                label: const Text('Reply'),
+                label: Text(AppLocalizations.of(context).tr('reply')),
               ),
             ),
         ],
@@ -782,6 +801,95 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
       return '${difference.inMinutes}m ago';
     } else {
       return 'Just now';
+    }
+  }
+
+  Future<void> _navigateToChat() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      if (currentUser == null) return;
+
+      final firestoreService = FirestoreService();
+
+      // Get requester data for name
+      final requesterData = await firestoreService.getUserData(widget.request.requesterId);
+      final requesterName = requesterData?.name ?? 'User';
+
+      // Create or get chat
+      final chatId = await firestoreService.getOrCreateChat(
+        currentUser.uid,
+        widget.request.requesterId,
+        rentalRequestId: widget.request.id,
+        rentalRequestName: widget.request.itemDescription,
+      );
+
+      // Send request_card message
+      final message = ChatMessageModel(
+        id: '',
+        chatId: chatId,
+        senderId: currentUser.uid,
+        message: '',
+        timestamp: DateTime.now(),
+        messageType: 'request_card',
+        requestId: widget.request.id,
+        requestDescription: widget.request.itemDescription,
+        requestBudget: widget.request.estimatedBudget,
+      );
+
+      await firestoreService.sendMessage(message);
+
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              chatId: chatId,
+              otherUserId: widget.request.requesterId,
+              otherUserName: requesterName,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _navigateToChatWithUser(String userId, String userName) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      if (currentUser == null) return;
+
+      final firestoreService = FirestoreService();
+      final chatId = await firestoreService.getOrCreateChat(
+        currentUser.uid,
+        userId,
+        rentalRequestId: widget.request.id,
+        rentalRequestName: widget.request.itemDescription,
+      );
+
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              chatId: chatId,
+              otherUserId: userId,
+              otherUserName: userName,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
     }
   }
 }
