@@ -244,14 +244,57 @@ class FirestoreService {
             message.toFirestore(),
           );
 
-      // Update chat with last message
+      // Get chat to find other participants
+      final chatDoc = await _firestore.collection('chats').doc(message.chatId).get();
+      final participants = List<String>.from(chatDoc.data()?['participants'] ?? []);
+
+      // Build unread increment for all participants except sender
+      final unreadUpdates = <String, dynamic>{};
+      for (final uid in participants) {
+        if (uid != message.senderId) {
+          unreadUpdates['unreadCount.$uid'] = FieldValue.increment(1);
+        }
+      }
+
+      // Update chat with last message + unread counts
       await _firestore.collection('chats').doc(message.chatId).update({
         'lastMessage': message.message.isEmpty ? '📷 Image' : message.message,
         'lastMessageTime': Timestamp.fromDate(message.timestamp),
+        ...unreadUpdates,
       });
     } catch (e) {
       throw Exception('Failed to send message: $e');
     }
+  }
+
+  /// Mark all messages in a chat as read for a user (reset unread count)
+  Future<void> markChatAsRead(String chatId, String userId) async {
+    try {
+      await _firestore.collection('chats').doc(chatId).update({
+        'unreadCount.$userId': 0,
+      });
+    } catch (e) {
+      // Silently fail — not critical
+    }
+  }
+
+  /// Stream of total unread message count across all chats for a user
+  Stream<int> getTotalUnreadCount(String userId) {
+    return _firestore
+        .collection('chats')
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+      int total = 0;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final unread = data['unreadCount'];
+        if (unread != null && unread is Map && unread[userId] != null) {
+          total += (unread[userId] as num).toInt();
+        }
+      }
+      return total;
+    });
   }
 
   /// Get messages for a chat
@@ -272,6 +315,8 @@ class FirestoreService {
     String userId2, {
     String? rentalItemId,
     String? rentalItemName,
+    String? rentalRequestId,
+    String? rentalRequestName,
   }) async {
     try {
       // Check if chat already exists
@@ -284,11 +329,17 @@ class FirestoreService {
         final chat = ChatModel.fromFirestore(doc);
         if (chat.participants.contains(userId2)) {
           // If this is an old chat missing rental info, patch it!
+          final updates = <String, dynamic>{};
           if (rentalItemId != null && chat.rentalItemId == null) {
-            await _firestore.collection('chats').doc(doc.id).update({
-              'rentalItemId': rentalItemId,
-              'rentalItemName': rentalItemName,
-            });
+            updates['rentalItemId'] = rentalItemId;
+            updates['rentalItemName'] = rentalItemName;
+          }
+          if (rentalRequestId != null && chat.rentalRequestId == null) {
+            updates['rentalRequestId'] = rentalRequestId;
+            updates['rentalRequestName'] = rentalRequestName;
+          }
+          if (updates.isNotEmpty) {
+            await _firestore.collection('chats').doc(doc.id).update(updates);
           }
           return doc.id;
         }
@@ -300,6 +351,8 @@ class FirestoreService {
         participants: [userId1, userId2],
         rentalItemId: rentalItemId,
         rentalItemName: rentalItemName,
+        rentalRequestId: rentalRequestId,
+        rentalRequestName: rentalRequestName,
         createdAt: DateTime.now(),
       );
 
