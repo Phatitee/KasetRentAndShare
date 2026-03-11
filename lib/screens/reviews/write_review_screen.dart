@@ -5,6 +5,8 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/review_model.dart';
 import '../../models/rental_contract_model.dart';
+import '../../models/user_model.dart';
+import '../../widgets/user_avatar.dart';
 
 class WriteReviewScreen extends StatefulWidget {
   final RentalContractModel contract;
@@ -25,21 +27,21 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   bool _isSubmitting = false;
 
   final List<String> _ownerTags = [
-    'Returned on time',
-    'Good condition',
-    'Great communication',
-    'Friendly',
-    'Trustworthy',
-    'Would rent again',
+    'คืนของตรงเวลา',
+    'สภาพดี',
+    'สื่อสารดี',
+    'เป็นมิตร',
+    'น่าเชื่อถือ',
+    'อยากให้เช่าอีก',
   ];
 
   final List<String> _renterTags = [
-    'Item as described',
-    'Clean & well-maintained',
-    'Flexible pickup',
-    'Responsive',
-    'Fair pricing',
-    'Highly recommended',
+    'ตรงตามรายละเอียด',
+    'สะอาด ดูแลดี',
+    'นัดรับสะดวก',
+    'ตอบไว',
+    'ราคายุติธรรม',
+    'แนะนำอย่างยิ่ง',
   ];
 
   @override
@@ -142,48 +144,48 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppTheme.primaryTeal,
-                    child: Text(
-                      revieweeName.substring(0, 1).toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
+              child: FutureBuilder<UserModel?>(
+                future: FirestoreService().getUserData(isOwner ? widget.contract.renterId : widget.contract.ownerId),
+                builder: (context, snapshot) {
+                  final reviewee = snapshot.data;
+                  return Row(
+                    children: [
+                      UserAvatar(
+                        photoUrl: reviewee?.photoUrl,
+                        name: revieweeName,
+                        radius: 28,
                         fontSize: 24,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Review for',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 13,
-                          ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Review for',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              revieweeName,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isOwner ? 'Renter' : 'Owner',
+                              style: TextStyle(
+                                color: AppTheme.primaryTeal,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          revieweeName,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isOwner ? 'Renter' : 'Owner',
-                          style: TextStyle(
-                            color: AppTheme.primaryTeal,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 24),
