@@ -8,6 +8,8 @@ class RentalContractModel {
   final String ownerName;
   final String renterId;
   final String renterName;
+  final String? ownerSignatureUrl;
+  final String? renterSignatureUrl;
   final DateTime startDate;
   final DateTime endDate;
   final double dailyRate;
@@ -15,17 +17,28 @@ class RentalContractModel {
   final double deposit;
   final String condition;
   final String? ownerNotes;
-  final GeoPoint? pickupLocation;
-  final String? pickupLocationName;
-  final GeoPoint? returnLocation;
-  final String? returnLocationName;
+  
+  // Payment
+  final String? paymentSlipUrl;
+  final String paymentStatus; // 'pending', 'paid'
+  final DateTime? paymentConfirmedAt;
+
+  // Pickup Evidence
+  final GeoPoint? ownerPickupLocation;
+  final GeoPoint? renterPickupLocation;
+  final String? pickupPhotoUrl;
   final DateTime? pickupConfirmedAt;
-  final DateTime? returnConfirmedAt;
   final bool ownerPickupConfirmed;
   final bool renterPickupConfirmed;
+
+  // Return Evidence
+  final GeoPoint? ownerReturnLocation;
+  final GeoPoint? renterReturnLocation;
+  final String? returnPhotoUrl;
+  final DateTime? returnConfirmedAt;
   final bool ownerReturnConfirmed;
   final bool renterReturnConfirmed;
-  final String status; // pending, active, completed, disputed
+
   final DateTime createdAt;
 
   RentalContractModel({
@@ -36,6 +49,8 @@ class RentalContractModel {
     required this.ownerName,
     required this.renterId,
     required this.renterName,
+    this.ownerSignatureUrl,
+    this.renterSignatureUrl,
     required this.startDate,
     required this.endDate,
     required this.dailyRate,
@@ -43,28 +58,30 @@ class RentalContractModel {
     required this.deposit,
     required this.condition,
     this.ownerNotes,
-    this.pickupLocation,
-    this.pickupLocationName,
-    this.returnLocation,
-    this.returnLocationName,
+    this.paymentSlipUrl,
+    this.paymentStatus = 'pending',
+    this.paymentConfirmedAt,
+    this.ownerPickupLocation,
+    this.renterPickupLocation,
+    this.pickupPhotoUrl,
     this.pickupConfirmedAt,
-    this.returnConfirmedAt,
     this.ownerPickupConfirmed = false,
     this.renterPickupConfirmed = false,
+    this.ownerReturnLocation,
+    this.renterReturnLocation,
+    this.returnPhotoUrl,
+    this.returnConfirmedAt,
     this.ownerReturnConfirmed = false,
     this.renterReturnConfirmed = false,
-    this.status = 'pending',
     required this.createdAt,
   });
 
+  bool get isPickupComplete => ownerPickupConfirmed && renterPickupConfirmed;
+  bool get isReturnComplete => ownerReturnConfirmed && renterReturnConfirmed;
+  bool get isSigned => ownerSignatureUrl != null && renterSignatureUrl != null;
+
   /// Calculate rental duration in days
   int get rentalDays => endDate.difference(startDate).inDays + 1;
-
-  /// Check if both parties confirmed pickup
-  bool get isPickupComplete => ownerPickupConfirmed && renterPickupConfirmed;
-
-  /// Check if both parties confirmed return
-  bool get isReturnComplete => ownerReturnConfirmed && renterReturnConfirmed;
 
   factory RentalContractModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -76,6 +93,8 @@ class RentalContractModel {
       ownerName: data['ownerName'] ?? '',
       renterId: data['renterId'] ?? '',
       renterName: data['renterName'] ?? '',
+      ownerSignatureUrl: data['ownerSignatureUrl'],
+      renterSignatureUrl: data['renterSignatureUrl'],
       startDate: (data['startDate'] as Timestamp).toDate(),
       endDate: (data['endDate'] as Timestamp).toDate(),
       dailyRate: (data['dailyRate'] ?? 0).toDouble(),
@@ -83,21 +102,27 @@ class RentalContractModel {
       deposit: (data['deposit'] ?? 0).toDouble(),
       condition: data['condition'] ?? '',
       ownerNotes: data['ownerNotes'],
-      pickupLocation: data['pickupLocation'] as GeoPoint?,
-      pickupLocationName: data['pickupLocationName'],
-      returnLocation: data['returnLocation'] as GeoPoint?,
-      returnLocationName: data['returnLocationName'],
+      paymentSlipUrl: data['paymentSlipUrl'],
+      paymentStatus: data['paymentStatus'] ?? 'pending',
+      paymentConfirmedAt: data['paymentConfirmedAt'] != null
+          ? (data['paymentConfirmedAt'] as Timestamp).toDate()
+          : null,
+      ownerPickupLocation: data['ownerPickupLocation'] as GeoPoint?,
+      renterPickupLocation: data['renterPickupLocation'] as GeoPoint?,
+      pickupPhotoUrl: data['pickupPhotoUrl'],
       pickupConfirmedAt: data['pickupConfirmedAt'] != null
           ? (data['pickupConfirmedAt'] as Timestamp).toDate()
           : null,
+      ownerPickupConfirmed: data['ownerPickupConfirmed'] ?? false,
+      renterPickupConfirmed: data['renterPickupConfirmed'] ?? false,
+      ownerReturnLocation: data['ownerReturnLocation'] as GeoPoint?,
+      renterReturnLocation: data['renterReturnLocation'] as GeoPoint?,
+      returnPhotoUrl: data['returnPhotoUrl'],
       returnConfirmedAt: data['returnConfirmedAt'] != null
           ? (data['returnConfirmedAt'] as Timestamp).toDate()
           : null,
-      ownerPickupConfirmed: data['ownerPickupConfirmed'] ?? false,
-      renterPickupConfirmed: data['renterPickupConfirmed'] ?? false,
       ownerReturnConfirmed: data['ownerReturnConfirmed'] ?? false,
       renterReturnConfirmed: data['renterReturnConfirmed'] ?? false,
-      status: data['status'] ?? 'pending',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
@@ -110,6 +135,8 @@ class RentalContractModel {
       'ownerName': ownerName,
       'renterId': renterId,
       'renterName': renterName,
+      'ownerSignatureUrl': ownerSignatureUrl,
+      'renterSignatureUrl': renterSignatureUrl,
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
       'dailyRate': dailyRate,
@@ -117,21 +144,27 @@ class RentalContractModel {
       'deposit': deposit,
       'condition': condition,
       'ownerNotes': ownerNotes,
-      'pickupLocation': pickupLocation,
-      'pickupLocationName': pickupLocationName,
-      'returnLocation': returnLocation,
-      'returnLocationName': returnLocationName,
+      'paymentSlipUrl': paymentSlipUrl,
+      'paymentStatus': paymentStatus,
+      'paymentConfirmedAt': paymentConfirmedAt != null
+          ? Timestamp.fromDate(paymentConfirmedAt!)
+          : null,
+      'ownerPickupLocation': ownerPickupLocation,
+      'renterPickupLocation': renterPickupLocation,
+      'pickupPhotoUrl': pickupPhotoUrl,
       'pickupConfirmedAt': pickupConfirmedAt != null
           ? Timestamp.fromDate(pickupConfirmedAt!)
           : null,
+      'ownerPickupConfirmed': ownerPickupConfirmed,
+      'renterPickupConfirmed': renterPickupConfirmed,
+      'ownerReturnLocation': ownerReturnLocation,
+      'renterReturnLocation': renterReturnLocation,
+      'returnPhotoUrl': returnPhotoUrl,
       'returnConfirmedAt': returnConfirmedAt != null
           ? Timestamp.fromDate(returnConfirmedAt!)
           : null,
-      'ownerPickupConfirmed': ownerPickupConfirmed,
-      'renterPickupConfirmed': renterPickupConfirmed,
       'ownerReturnConfirmed': ownerReturnConfirmed,
       'renterReturnConfirmed': renterReturnConfirmed,
-      'status': status,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -144,6 +177,8 @@ class RentalContractModel {
     String? ownerName,
     String? renterId,
     String? renterName,
+    String? ownerSignatureUrl,
+    String? renterSignatureUrl,
     DateTime? startDate,
     DateTime? endDate,
     double? dailyRate,
@@ -151,17 +186,21 @@ class RentalContractModel {
     double? deposit,
     String? condition,
     String? ownerNotes,
-    GeoPoint? pickupLocation,
-    String? pickupLocationName,
-    GeoPoint? returnLocation,
-    String? returnLocationName,
+    String? paymentSlipUrl,
+    String? paymentStatus,
+    DateTime? paymentConfirmedAt,
+    GeoPoint? ownerPickupLocation,
+    GeoPoint? renterPickupLocation,
+    String? pickupPhotoUrl,
     DateTime? pickupConfirmedAt,
-    DateTime? returnConfirmedAt,
     bool? ownerPickupConfirmed,
     bool? renterPickupConfirmed,
+    GeoPoint? ownerReturnLocation,
+    GeoPoint? renterReturnLocation,
+    String? returnPhotoUrl,
+    DateTime? returnConfirmedAt,
     bool? ownerReturnConfirmed,
     bool? renterReturnConfirmed,
-    String? status,
     DateTime? createdAt,
   }) {
     return RentalContractModel(
@@ -172,6 +211,8 @@ class RentalContractModel {
       ownerName: ownerName ?? this.ownerName,
       renterId: renterId ?? this.renterId,
       renterName: renterName ?? this.renterName,
+      ownerSignatureUrl: ownerSignatureUrl ?? this.ownerSignatureUrl,
+      renterSignatureUrl: renterSignatureUrl ?? this.renterSignatureUrl,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       dailyRate: dailyRate ?? this.dailyRate,
@@ -179,17 +220,21 @@ class RentalContractModel {
       deposit: deposit ?? this.deposit,
       condition: condition ?? this.condition,
       ownerNotes: ownerNotes ?? this.ownerNotes,
-      pickupLocation: pickupLocation ?? this.pickupLocation,
-      pickupLocationName: pickupLocationName ?? this.pickupLocationName,
-      returnLocation: returnLocation ?? this.returnLocation,
-      returnLocationName: returnLocationName ?? this.returnLocationName,
+      paymentSlipUrl: paymentSlipUrl ?? this.paymentSlipUrl,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
+      ownerPickupLocation: ownerPickupLocation ?? this.ownerPickupLocation,
+      renterPickupLocation: renterPickupLocation ?? this.renterPickupLocation,
+      pickupPhotoUrl: pickupPhotoUrl ?? this.pickupPhotoUrl,
       pickupConfirmedAt: pickupConfirmedAt ?? this.pickupConfirmedAt,
-      returnConfirmedAt: returnConfirmedAt ?? this.returnConfirmedAt,
       ownerPickupConfirmed: ownerPickupConfirmed ?? this.ownerPickupConfirmed,
       renterPickupConfirmed: renterPickupConfirmed ?? this.renterPickupConfirmed,
+      ownerReturnLocation: ownerReturnLocation ?? this.ownerReturnLocation,
+      renterReturnLocation: renterReturnLocation ?? this.renterReturnLocation,
+      returnPhotoUrl: returnPhotoUrl ?? this.returnPhotoUrl,
+      returnConfirmedAt: returnConfirmedAt ?? this.returnConfirmedAt,
       ownerReturnConfirmed: ownerReturnConfirmed ?? this.ownerReturnConfirmed,
       renterReturnConfirmed: renterReturnConfirmed ?? this.renterReturnConfirmed,
-      status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
     );
   }
