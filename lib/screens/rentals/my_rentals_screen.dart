@@ -7,6 +7,8 @@ import '../../models/rental_item_model.dart';
 import '../../models/rental_request_model.dart';
 import 'package:intl/intl.dart';
 import 'request_details_screen.dart';
+import 'post_rental_screen.dart';
+import 'post_request_screen.dart';
 
 class MyRentalsScreen extends StatefulWidget {
   const MyRentalsScreen({super.key});
@@ -216,29 +218,35 @@ class RentalItemCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _showStatusUpdateDialog(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image
           if (item.imageUrls.isNotEmpty)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(
-                item.imageUrls.first,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 120,
-                    color: AppTheme.backgroundColor,
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 48,
-                      color: AppTheme.textHint,
-                    ),
-                  );
-                },
+              child: AspectRatio(
+                aspectRatio: 4 / 3, // Use AspectRatio instead of fixed height to avoid aggressive cropping
+                child: Image.network(
+                  item.imageUrls.first,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: AppTheme.backgroundColor,
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 48,
+                        color: AppTheme.textHint,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
 
@@ -248,26 +256,109 @@ class RentalItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Item Name & Category
+                // Item Name & Category & Actions
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        item.itemName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.itemName,
+                            style: Theme.of(context).textTheme.titleMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.category,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
                     _buildStatusBadge(item.status),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PostRentalScreen(itemToEdit: item),
+                            ),
+                          );
+                        } else if (value == 'delete') {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('ลบโพสต์'),
+                              content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('ยกเลิก'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                                  child: const Text('ลบ', style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true && context.mounted) {
+                            try {
+                              await FirestoreService().deleteRentalItem(item.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('ลบโพสต์เรียบร้อยแล้ว'),
+                                    backgroundColor: AppTheme.secondaryGreen,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('เกิดข้อผิดพลาด: $e'),
+                                    backgroundColor: AppTheme.error,
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 20),
+                              SizedBox(width: 8),
+                              Text('แก้ไขโพสต์'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text('ลบโพสต์', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.category,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
                 ),
                 const SizedBox(height: 12),
 
@@ -324,7 +415,100 @@ class RentalItemCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
+      ),
     );
+  }
+
+  void _showStatusUpdateDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'อัพเดทสถานะสินค้า',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: AppTheme.secondaryGreen),
+                title: const Text('ว่างอยู่ (Available)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'available');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.lock_outline, color: AppTheme.error),
+                title: const Text('มีคนเช่าอยู่ (Rented)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'rented');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined, color: Colors.grey),
+                title: const Text('ซ่อนโพสต์ (Hidden)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'hidden');
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    if (item.status == newStatus) return; // No change
+
+    try {
+      if (newStatus == 'rented') {
+        // Just generic rented if they didn't do it via chat
+        await FirestoreService().updateRentalItem(item.id, {
+          'status': 'rented',
+        });
+      } else if (newStatus == 'hidden') {
+        await FirestoreService().updateRentalItem(item.id, {
+          'status': 'hidden',
+        });
+      } else {
+        await FirestoreService().updateRentalItem(item.id, {
+          'status': 'available',
+          'rentedToUserId': null,
+          'rentedToUserName': null,
+        });
+      }
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('อัพเดทสถานะเรียบร้อยแล้ว'),
+            backgroundColor: AppTheme.secondaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildStatusBadge(String status) {
@@ -346,7 +530,12 @@ class RentalItemCard extends StatelessWidget {
       case 'rented':
         backgroundColor = AppTheme.statusRented;
         textColor = Colors.white;
-        label = 'Rented To Beam';
+        label = 'Rented';
+        break;
+      case 'hidden':
+        backgroundColor = Colors.grey;
+        textColor = Colors.white;
+        label = 'Hidden';
         break;
       default:
         backgroundColor = AppTheme.textHint;
@@ -381,19 +570,14 @@ class RentalRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final duration = request.rentalDurationDays;
+    final isHidden = request.status == 'hidden';
 
     return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => RequestDetailsScreen(request: request),
-          ),
-        );
-      },
+      onTap: () => _showStatusUpdateDialog(context),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isHidden ? Colors.grey.shade50 : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -406,18 +590,19 @@ class RentalRequestCard extends StatelessWidget {
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Item Description & Category
+          // Item Description & Category & Actions
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryTeal.withAlpha(26),
+                  color: isHidden ? Colors.grey.shade200 : AppTheme.primaryTeal.withAlpha(26),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  Icons.search,
-                  color: AppTheme.primaryTeal,
+                  isHidden ? Icons.visibility_off_outlined : Icons.search,
+                  color: isHidden ? Colors.grey : AppTheme.primaryTeal,
                   size: 24,
                 ),
               ),
@@ -427,8 +612,10 @@ class RentalRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request.itemDescription,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      'ต้องการเช่าสินค้า: ${request.itemDescription}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: isHidden ? AppTheme.textSecondary : null,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -441,6 +628,85 @@ class RentalRequestCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              if (isHidden)
+                _buildStatusBadge('hidden'),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PostRequestScreen(requestToEdit: request),
+                      ),
+                    );
+                  } else if (value == 'delete') {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('ลบประกาศเช่า'),
+                        content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                            child: const Text('ลบ', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true && context.mounted) {
+                      try {
+                        await FirestoreService().deleteRentalRequest(request.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('ลบประกาศเรียบร้อยแล้ว'),
+                              backgroundColor: AppTheme.secondaryGreen,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('เกิดข้อผิดพลาด: $e'),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 8),
+                        Text('แก้ไขประกาศ'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text('ลบประกาศ', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -459,7 +725,7 @@ class RentalRequestCard extends StatelessWidget {
               Text(
                 '฿${request.estimatedBudget}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.primaryTeal,
+                      color: isHidden ? AppTheme.textHint : AppTheme.primaryTeal,
                       fontWeight: FontWeight.bold,
                     ),
               ),
@@ -499,39 +765,141 @@ class RentalRequestCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.accentMint.withAlpha(100),
+              color: isHidden ? Colors.grey.shade100 : AppTheme.accentMint.withAlpha(100),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '$duration ${duration > 1 ? 'days' : 'day'}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: isHidden ? Colors.grey : null,
                   ),
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Location
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                size: 16,
-                color: AppTheme.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  request.locationName,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
+      ),
+    );
+  }
+
+  void _showStatusUpdateDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'อัพเดทสถานะประกาศ',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: AppTheme.secondaryGreen),
+                title: const Text('กำลังประกาศหาของ (Active)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'active');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.done_all, color: Colors.blue),
+                title: const Text('ได้ของที่ต้องการแล้ว (Fulfilled)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'fulfilled');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined, color: Colors.grey),
+                title: const Text('ซ่อนประกาศ (Hidden)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _updateStatus(context, 'hidden');
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    if (request.status == newStatus) return;
+
+    try {
+      await FirestoreService().updateRentalRequest(request.id, {
+        'status': newStatus,
+      });
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('อัพเดทสถานะเรียบร้อยแล้ว'),
+            backgroundColor: AppTheme.secondaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color backgroundColor;
+    Color textColor;
+    String label;
+
+    switch (status) {
+      case 'active':
+        backgroundColor = AppTheme.statusAvailable;
+        textColor = Colors.white;
+        label = 'Active';
+        break;
+      case 'fulfilled':
+        backgroundColor = Colors.blue;
+        textColor = Colors.white;
+        label = 'Fulfilled';
+        break;
+      case 'hidden':
+        backgroundColor = Colors.grey;
+        textColor = Colors.white;
+        label = 'Hidden';
+        break;
+      default:
+        backgroundColor = AppTheme.textHint;
+        textColor = Colors.white;
+        label = status;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
