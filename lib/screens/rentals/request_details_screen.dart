@@ -539,6 +539,8 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
   }
 
   Widget _buildOfferCard(OfferModel offer, bool isRequestOwner) {
+    final currentUserId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -549,51 +551,57 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Offerer Info
-          Row(
-            children: [
-              UserAvatar(
-                photoUrl: null, // Offer model doesn't have photoUrl yet
-                name: offer.offererName,
-                radius: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      offer.offererName,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Row(
+          FutureBuilder<UserModel?>(
+            future: FirestoreService().getUserData(offer.offererId),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              return Row(
+                children: [
+                  UserAvatar(
+                    photoUrl: user?.photoUrl,
+                    name: offer.offererName,
+                    radius: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.star,
-                          size: 14,
-                          color: Colors.amber[700],
-                        ),
-                        const SizedBox(width: 4),
                         Text(
-                          offer.offererRating.toStringAsFixed(1),
-                          style: Theme.of(context).textTheme.bodySmall,
+                          offer.offererName,
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getTimeAgo(offer.createdAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber[700],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              offer.offererRating.toStringAsFixed(1),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getTimeAgo(offer.createdAt),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, size: 20),
-                onPressed: () {},
-              ),
-            ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onPressed: () {},
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -654,19 +662,96 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Reply button (for request owner)
-          if (isRequestOwner)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _navigateToChatWithUser(offer.offererId, offer.offererName),
-                icon: const Icon(Icons.reply, size: 18),
-                label: Text(AppLocalizations.of(context).tr('reply')),
+          // Reply button (Visible to anyone except the person who made the offer)
+          if (offer.offererId != currentUserId)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _navigateToChatWithOffer(offer, isRequestOwner),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: Text(isRequestOwner ? AppLocalizations.of(context).tr('reply') : 'สนใจข้อเสนอนี้ (Chat)'),
+                ),
               ),
             ),
         ],
       ),
     );
+  }
+
+  Future<void> _navigateToChatWithOffer(OfferModel offer, bool isRequestOwner) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      if (currentUser == null) return;
+
+      final firestoreService = FirestoreService();
+      final chatId = await firestoreService.getOrCreateChat(
+        currentUser.uid,
+        offer.offererId,
+        rentalRequestId: widget.request.id,
+        rentalRequestName: widget.request.itemDescription,
+      );
+
+      // Send request_card message to give context
+      final message = ChatMessageModel(
+        id: '',
+        chatId: chatId,
+        senderId: currentUser.uid,
+        message: '🛍️ สนใจข้อเสนอสำหรับ: ${widget.request.itemDescription}',
+        timestamp: DateTime.now(),
+        messageType: 'request_card',
+        requestId: widget.request.id,
+        requestDescription: widget.request.itemDescription,
+        requestBudget: widget.request.estimatedBudget,
+      );
+
+      await firestoreService.sendMessage(message);
+
+      // Construct auto message based on who is replying
+      String autoMsg;
+      if (isRequestOwner) {
+        autoMsg = '🛍️ สวัสดีครับ/ค่ะ! ตอบกลับจากข้อเสนอของคุณ: "${offer.itemDescription}"\n'
+            'สำหรับโพสต์ที่ฉันประกาศหาของเช่า\n'
+            'ต้องการคุยรายละเอียดเพิ่มเติมครับ/ค่ะ 😊';
+      } else {
+        autoMsg = '🛍️ สวัสดีครับ/ค่ะ! ฉันเห็นข้อเสนอของคุณ: "${offer.itemDescription}"\n'
+            'ในโพสต์หาของเช่า "${widget.request.itemDescription}"\n'
+            'พอดีฉันสนใจสิ่งนี้เหมือนกัน ขอคุยรายละเอียดเพิ่มเติมครับ/ค่ะ 😊';
+      }
+
+      await firestoreService.sendMessage(
+        ChatMessageModel(
+          id: '',
+          chatId: chatId,
+          senderId: currentUser.uid,
+          message: autoMsg,
+          timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+          messageType: 'text',
+        ),
+      );
+
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              chatId: chatId,
+              otherUserId: offer.offererId,
+              otherUserName: offer.offererName,
+              rentalRequestId: widget.request.id,
+              rentalRequestName: widget.request.itemDescription,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
   }
 
   Widget _buildOfferForm() {
