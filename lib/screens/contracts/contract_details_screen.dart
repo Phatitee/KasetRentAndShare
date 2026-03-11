@@ -88,7 +88,11 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
 
         // Send status message to chat
         if (_contract.chatId.isNotEmpty) {
-          await FirestoreService().sendSystemMessage(_contract.chatId, 'ผู้เช่าอัปโหลดสลิปการโอนเงินแล้ว');
+          await FirestoreService().sendSystemMessage(
+            _contract.chatId,
+            'ผู้เช่าอัปโหลดสลิปการโอนเงินแล้ว',
+            contractId: _contract.id,
+          );
         }
 
         _refreshContract();
@@ -111,7 +115,11 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
 
       // Send status message to chat
       if (_contract.chatId.isNotEmpty) {
-        await FirestoreService().sendSystemMessage(_contract.chatId, 'ผู้ให้เช่ายืนยันการรับเงินเรียบร้อยแล้ว');
+        await FirestoreService().sendSystemMessage(
+          _contract.chatId,
+          'ผู้ให้เช่ายืนยันการรับเงินเรียบร้อยแล้ว',
+          contractId: _contract.id,
+        );
       }
 
       _refreshContract();
@@ -164,9 +172,17 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
       // Send status message to chat
       if (_contract.chatId.isNotEmpty) {
         final role = isOwner ? 'ผู้ให้เช่า' : 'ผู้เช่า';
-        await FirestoreService().sendSystemMessage(_contract.chatId, 'ยืนยันการรับของแล้ว ($role)');
+        await FirestoreService().sendSystemMessage(
+          _contract.chatId,
+          'ยืนยันการรับของแล้ว ($role)',
+          contractId: _contract.id,
+        );
         if (bothConfirmed) {
-          await FirestoreService().sendSystemMessage(_contract.chatId, 'การรับของเสร็จสมบูรณ์');
+          await FirestoreService().sendSystemMessage(
+            _contract.chatId,
+            'การรับของเสร็จสมบูรณ์',
+            contractId: _contract.id,
+          );
         }
       }
 
@@ -218,9 +234,17 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
       // Send status message to chat
       if (_contract.chatId.isNotEmpty) {
         final role = isOwner ? 'ผู้ให้เช่า' : 'ผู้เช่า';
-        await FirestoreService().sendSystemMessage(_contract.chatId, 'ยืนยันการคืนของแล้ว ($role)');
+        await FirestoreService().sendSystemMessage(
+          _contract.chatId,
+          'ยืนยันการคืนของแล้ว ($role)',
+          contractId: _contract.id,
+        );
         if (bothConfirmed) {
-          await FirestoreService().sendSystemMessage(_contract.chatId, 'การคืนของเสร็จสมบูรณ์');
+          await FirestoreService().sendSystemMessage(
+            _contract.chatId,
+            'การคืนของเสร็จสมบูรณ์',
+            contractId: _contract.id,
+          );
         }
       }
 
@@ -293,40 +317,63 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = Provider.of<AuthService>(context, listen: false).currentUser!.uid;
-    final isOwner = currentUserId == _contract.ownerId;
-    final isPaid = _contract.paymentStatus == 'paid';
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser!.uid;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contract Details'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: () => PdfGenerator.generateContractPdf(_contract),
-          ),
-        ],
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator()) 
-        : ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (_contract.isReturnComplete && !_hasReviewed)
-                _buildReviewBanner(),
-              _buildPaymentSection(isOwner),
-              const SizedBox(height: 16),
-              _buildFlowStep('1. รับของ (Pickup)', _contract.ownerPickupConfirmed, _contract.renterPickupConfirmed, _contract.pickupPhotoUrl, () => _handlePickup(isOwner), isOwner, enabled: isPaid),
-              const SizedBox(height: 16),
-              _buildFlowStep('2. คืนของ (Return)', _contract.ownerReturnConfirmed, _contract.renterReturnConfirmed, _contract.returnPhotoUrl, () => _handleReturn(isOwner), isOwner, enabled: _contract.isPickupComplete),
-              const SizedBox(height: 24),
-              _buildInfoSection(),
-              if (_contract.isReturnComplete) ...[
-                const SizedBox(height: 24),
-                _buildReviewSection(currentUserId),
-              ],
+    return StreamBuilder<RentalContractModel?>(
+      stream: FirebaseFirestore.instance
+          .collection('contracts')
+          .doc(widget.contract.id)
+          .snapshots()
+          .map((doc) => doc.exists ? RentalContractModel.fromFirestore(doc) : null),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        final contract = snapshot.data;
+        if (contract == null) {
+          return const Scaffold(body: Center(child: Text('ไม่พบข้อมูลสัญญา')));
+        }
+        
+        // Update local state if needed (for actions that use _contract)
+        _contract = contract;
+        
+        final isOwner = currentUserId == contract.ownerId;
+        final isPaid = contract.paymentStatus == 'paid';
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('รายละเอียดสัญญา'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.picture_as_pdf),
+                onPressed: () => PdfGenerator.generateContractPdf(contract),
+              ),
             ],
           ),
+          body: _isLoading 
+            ? const Center(child: CircularProgressIndicator()) 
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (contract.isReturnComplete && !_hasReviewed)
+                    _buildReviewBanner(),
+                  _buildPaymentSection(isOwner),
+                  const SizedBox(height: 16),
+                  _buildFlowStep('1. รับของ (Pickup)', contract.ownerPickupConfirmed, contract.renterPickupConfirmed, contract.pickupPhotoUrl, () => _handlePickup(isOwner), isOwner, enabled: isPaid),
+                  const SizedBox(height: 16),
+                  _buildFlowStep('2. คืนของ (Return)', contract.ownerReturnConfirmed, contract.renterReturnConfirmed, contract.returnPhotoUrl, () => _handleReturn(isOwner), isOwner, enabled: contract.isPickupComplete),
+                  const SizedBox(height: 24),
+                  _buildInfoSection(),
+                  if (contract.isReturnComplete) ...[
+                    const SizedBox(height: 24),
+                    _buildReviewSection(currentUserId),
+                  ],
+                ],
+              ),
+        );
+      }
     );
   }
 
@@ -474,9 +521,15 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: (enabled && !myOk) ? onConfirm : null,
-                icon: const Icon(Icons.camera_alt),
-                label: Text(myOk ? 'รอยืนยันอีกฝ่าย...' : 'ถ่ายรูปและยืนยัน'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryTeal),
+                icon: Icon(myOk && otherOk ? Icons.check_circle : Icons.camera_alt),
+                label: Text(
+                  myOk && otherOk 
+                    ? 'ยืนยันเสร็จสิ้น' 
+                    : (myOk ? 'รอยืนยันอีกฝ่าย...' : 'ถ่ายรูปและยืนยัน'),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: myOk && otherOk ? AppTheme.success : AppTheme.primaryTeal,
+                ),
               ),
             ),
           ],

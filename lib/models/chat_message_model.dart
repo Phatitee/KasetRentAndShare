@@ -19,6 +19,7 @@ class ChatMessageModel {
   // Contract specific fields
   final Map<String, dynamic>? contractData;
   final String? contractStatus; // 'pending' | 'accepted' | 'declined'
+  final String? contractId;
 
   // Request card fields
   final String? requestId;
@@ -40,6 +41,7 @@ class ChatMessageModel {
     this.itemPrice,
     this.contractData,
     this.contractStatus,
+    this.contractId,
     this.requestId,
     this.requestDescription,
     this.requestBudget,
@@ -64,6 +66,7 @@ class ChatMessageModel {
           : null,
       contractData: data['contractData'] != null ? Map<String, dynamic>.from(data['contractData']) : null,
       contractStatus: data['contractStatus'],
+      contractId: data['contractId'],
       requestId: data['requestId'],
       requestDescription: data['requestDescription'],
       requestBudget: data['requestBudget'] != null
@@ -87,6 +90,7 @@ class ChatMessageModel {
       'itemPrice': itemPrice,
       'contractData': contractData,
       'contractStatus': contractStatus,
+      'contractId': contractId,
       'requestId': requestId,
       'requestDescription': requestDescription,
       'requestBudget': requestBudget,

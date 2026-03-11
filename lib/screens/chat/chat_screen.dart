@@ -13,6 +13,7 @@ import '../../models/rental_item_model.dart';
 import '../../models/rental_request_model.dart';
 import '../rentals/item_detail_screen.dart';
 import '../rentals/request_details_screen.dart';
+import '../contracts/contract_details_screen.dart';
 import 'create_contract_screen.dart';
 import '../../widgets/user_avatar.dart';
 import '../../models/user_model.dart';
@@ -531,34 +532,74 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<void> _navigateToContractDetails(String contractId) async {
+    try {
+      final contract = await FirestoreService().getContract(contractId);
+      if (contract != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ContractDetailsScreen(contract: contract),
+          ),
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ไม่พบข้อมูลสัญญา')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildStatusMessage(ChatMessageModel message) {
+    final bool isClickable = message.contractId != null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 32),
       child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppTheme.backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.divider),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  message.message,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+        child: GestureDetector(
+          onTap: isClickable
+              ? () => _navigateToContractDetails(message.contractId!)
+              : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isClickable ? AppTheme.primaryTeal.withAlpha(20) : AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isClickable ? AppTheme.primaryTeal.withAlpha(100) : AppTheme.divider,
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isClickable ? Icons.description_outlined : Icons.info_outline,
+                  size: 14,
+                  color: isClickable ? AppTheme.primaryTeal : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    message.message,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isClickable ? AppTheme.primaryTeal : AppTheme.textSecondary,
+                      fontWeight: isClickable ? FontWeight.bold : FontWeight.w500,
+                      decoration: isClickable ? TextDecoration.underline : null,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

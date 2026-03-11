@@ -15,6 +15,7 @@ class PdfGenerator {
     // Download images
     pw.MemoryImage? ownerSignature;
     pw.MemoryImage? renterSignature;
+    pw.MemoryImage? paymentSlip;
     pw.MemoryImage? pickupPhoto;
     pw.MemoryImage? returnPhoto;
 
@@ -23,6 +24,9 @@ class PdfGenerator {
     }
     if (contract.renterSignatureUrl != null) {
       renterSignature = await _downloadImage(contract.renterSignatureUrl!);
+    }
+    if (contract.paymentSlipUrl != null) {
+      paymentSlip = await _downloadImage(contract.paymentSlipUrl!);
     }
     if (contract.pickupPhotoUrl != null) {
       pickupPhoto = await _downloadImage(contract.pickupPhotoUrl!);
@@ -44,7 +48,7 @@ class PdfGenerator {
             pw.SizedBox(height: 15),
             _buildContractInfo(contract, boldTtf),
             pw.SizedBox(height: 15),
-            _buildFinancialInfo(contract, boldTtf),
+            _buildFinancialInfo(contract, boldTtf, paymentSlip),
             pw.SizedBox(height: 20),
             _buildEvidenceSection('หลักฐานการส่งมอบ (Pickup Evidence)', contract.pickupConfirmedAt, pickupPhoto, boldTtf),
             pw.SizedBox(height: 20),
@@ -114,39 +118,61 @@ class PdfGenerator {
     );
   }
 
-  static pw.Widget _buildFinancialInfo(RentalContractModel contract, pw.Font boldFont) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(10),
-      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
-      child: pw.Column(
-        children: [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  static pw.Widget _buildFinancialInfo(RentalContractModel contract, pw.Font boldFont, pw.MemoryImage? slip) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('ข้อมูลการชำระเงิน (Financial Details)', style: pw.TextStyle(font: boldFont, fontSize: 14)),
+        pw.SizedBox(height: 5),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+          child: pw.Column(
             children: [
-              pw.Text('ยอดรวมค่าเช่า (Total Rental)'),
-              pw.Text('THB ${contract.totalAmount.toStringAsFixed(2)}'),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('ยอดรวมค่าเช่า (Total Rental)'),
+                  pw.Text('THB ${contract.totalAmount.toStringAsFixed(2)}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('เงินมัดจำ (Deposit)'),
+                  pw.Text('THB ${contract.deposit.toStringAsFixed(2)}'),
+                ],
+              ),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('สถานะการชำระเงิน'),
+                  pw.Text(contract.paymentStatus == 'paid' ? 'ชำระเงินแล้ว' : 'รอดำเนินการ'),
+                ],
+              ),
             ],
           ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('เงินมัดจำ (Deposit)'),
-              pw.Text('THB ${contract.deposit.toStringAsFixed(2)}'),
-            ],
-          ),
+        ),
+        if (slip != null) ...[
+          pw.SizedBox(height: 10),
+          pw.Text('หลักฐานการโอนเงิน (Payment Slip):', style: pw.TextStyle(font: boldFont, fontSize: 10)),
+          pw.SizedBox(height: 5),
+          pw.Center(child: pw.Image(slip, height: 200)),
         ],
-      ),
+      ],
     );
   }
 
   static pw.Widget _buildEvidenceSection(String title, DateTime? date, pw.MemoryImage? photo, pw.Font boldFont) {
-    if (date == null) return pw.SizedBox();
+    if (date == null && photo == null) return pw.SizedBox();
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(title, style: pw.TextStyle(font: boldFont, fontSize: 14)),
         pw.SizedBox(height: 5),
-        pw.Text('ยืนยันเมื่อ: ${DateFormat('d MMM yyyy, HH:mm').format(date)}'),
+        if (date != null)
+          pw.Text('ยืนยันเมื่อ: ${DateFormat('d MMM yyyy, HH:mm').format(date)}'),
         pw.SizedBox(height: 10),
         if (photo != null)
           pw.Center(child: pw.Image(photo, height: 150))
