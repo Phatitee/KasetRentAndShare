@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../services/firestore_service.dart';
 import '../../models/review_model.dart';
+import '../../models/user_model.dart';
+import '../../widgets/user_avatar.dart';
 
 class UserReviewsScreen extends StatelessWidget {
   final String userId;
@@ -156,61 +158,61 @@ class UserReviewsScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Reviewer info
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppTheme.secondaryGreen,
-                child: Text(
-                  review.reviewerName.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      review.reviewerName,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      review.reviewType == 'owner_to_renter' ? 'Owner' : 'Renter',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+          FutureBuilder<UserModel?>(
+            future: FirestoreService().getUserData(review.reviewerId),
+            builder: (context, snapshot) {
+              final reviewer = snapshot.data;
+              return Row(
                 children: [
-                  Row(
-                    children: List.generate(5, (index) {
-                      return Icon(
-                        index < review.rating ? Icons.star : Icons.star_border,
-                        color: Colors.amber[700],
-                        size: 16,
-                      );
-                    }),
+                  UserAvatar(
+                    photoUrl: reviewer?.photoUrl,
+                    name: review.reviewerName,
+                    radius: 20,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    DateFormat('d MMM yyyy').format(review.createdAt),
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 11,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          review.reviewerName,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        Text(
+                          review.reviewType == 'owner_to_renter' ? 'Owner' : 'Renter',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        children: List.generate(5, (index) {
+                          return Icon(
+                            index < review.rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber[700],
+                            size: 16,
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('d MMM yyyy').format(review.createdAt),
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
           const SizedBox(height: 12),
 
