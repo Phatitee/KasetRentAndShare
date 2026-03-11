@@ -10,7 +10,9 @@ import '../../services/firestore_service.dart';
 import '../../models/rental_item_model.dart';
 
 class PostRentalScreen extends StatefulWidget {
-  const PostRentalScreen({super.key});
+  final RentalItemModel? itemToEdit;
+
+  const PostRentalScreen({super.key, this.itemToEdit});
 
   @override
   State<PostRentalScreen> createState() => _PostRentalScreenState();
@@ -43,6 +45,23 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     'Good',
     'Fair',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.itemToEdit != null) {
+      final item = widget.itemToEdit!;
+      _itemNameController.text = item.itemName;
+      _dailyRateController.text = item.dailyRate.toString();
+      _depositController.text = item.deposit.toString();
+      _descriptionController.text = item.description;
+      _selectedCategory = item.category;
+      _selectedCondition = item.condition;
+      // We do not load existing remote images into _images which expects File
+      // Handling remote images deletion/addition in edit mode can be complex,
+      // so for now we either keep existing or replace entirely if new are picked.
+    }
+  }
 
   @override
   void dispose() {
@@ -93,7 +112,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
       return;
     }
 
-    if (_images.isEmpty) {
+    if (_images.isEmpty && widget.itemToEdit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.tr('add_photo_at_least'))),
       );
@@ -107,36 +126,66 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
       final cloudinaryService = CloudinaryService();
       final firestoreService = FirestoreService();
 
-      // Upload images to Cloudinary
-      final imageUrls = await cloudinaryService.uploadMultipleImages(
-        _images,
-        'kaset_rentals',
-      );
-
-      // Create rental item in Firestore
-      final item = RentalItemModel(
-        id: '',
-        ownerId: authService.currentUser!.uid,
-        itemName: _itemNameController.text.trim(),
-        category: _selectedCategory,
-        condition: _selectedCondition,
-        dailyRate: double.parse(_dailyRateController.text),
-        deposit: double.parse(_depositController.text),
-        description: _descriptionController.text.trim(),
-        imageUrls: imageUrls,
-        createdAt: DateTime.now(),
-      );
-
-      await firestoreService.createRentalItem(item);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.tr('rental_posted')),
-            backgroundColor: AppTheme.success,
-          ),
+      List<String> imageUrls = [];
+      
+      if (_images.isNotEmpty) {
+        // Upload images to Cloudinary
+        imageUrls = await cloudinaryService.uploadMultipleImages(
+          _images,
+          'kaset_rentals',
         );
-        Navigator.of(context).pop();
+      } else if (widget.itemToEdit != null) {
+        // Keep existing images if none were added
+        imageUrls = widget.itemToEdit!.imageUrls;
+      }
+
+      if (widget.itemToEdit != null) {
+        // Update existing item
+        await firestoreService.updateRentalItem(widget.itemToEdit!.id, {
+          'itemName': _itemNameController.text.trim(),
+          'category': _selectedCategory,
+          'condition': _selectedCondition,
+          'dailyRate': double.parse(_dailyRateController.text),
+          'deposit': double.parse(_depositController.text),
+          'description': _descriptionController.text.trim(),
+          if (_images.isNotEmpty) 'imageUrls': imageUrls, // only update if new images matching
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('อัพเดทโพสต์เรียบร้อยแล้ว'),
+              backgroundColor: AppTheme.success,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        // Create rental item in Firestore
+        final item = RentalItemModel(
+          id: '',
+          ownerId: authService.currentUser!.uid,
+          itemName: _itemNameController.text.trim(),
+          category: _selectedCategory,
+          condition: _selectedCondition,
+          dailyRate: double.parse(_dailyRateController.text),
+          deposit: double.parse(_depositController.text),
+          description: _descriptionController.text.trim(),
+          imageUrls: imageUrls,
+          createdAt: DateTime.now(),
+        );
+
+        await firestoreService.createRentalItem(item);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.tr('rental_posted')),
+              backgroundColor: AppTheme.success,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -195,7 +244,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(l.tr('post_rental_title')),
+        title: Text(widget.itemToEdit != null ? 'แก้ไขโพสต์' : l.tr('post_rental_title')),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -231,12 +280,16 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            '${l.tr('add_photos')} (${_images.length}/5)',
+                            widget.itemToEdit != null 
+                                ? 'ต้องการเปลี่ยนรูปภาพใหม่หรือไม่?' 
+                                : '${l.tr('add_photos')} (${_images.length}/5)',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            l.tr('clear_photos_trust'),
+                            widget.itemToEdit != null
+                                ? 'หากเพิ่มรูปใหม่ รูปเก่าจะถูกแทนที่'
+                                : l.tr('clear_photos_trust'),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
