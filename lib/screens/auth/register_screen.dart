@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
-import '../../services/firestore_service.dart';
-import '../../models/user_model.dart';
-import '../home/home_screen.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -40,7 +37,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final firestoreService = FirestoreService();
 
       // Create Firebase Auth account
       final userCredential = await authService.registerWithEmail(
@@ -49,30 +45,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _nameController.text.trim(),
       );
 
-      // Create user profile in Firestore
-      if (userCredential != null && userCredential.user != null) {
-        final user = UserModel(
-          uid: userCredential.user!.uid,
-          email: _emailController.text.trim(),
-          name: _nameController.text.trim(),
-          createdAt: DateTime.now(),
-        );
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set(user.toFirestore());
-      }
+      // Note: User profile creation in Firestore is now handled inside authService.registerWithEmail
+      // to ensure naming convention is applied consistently via _formatName helper.
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('สมัครสมาชิกสำเร็จ!'),
+            content: Text('สมัครสมาชิกสำเร็จ! กรุณายืนยันอีเมล'),
             backgroundColor: AppTheme.success,
           ),
         );
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
         );
       }
     } catch (e) {
@@ -169,13 +153,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Name Field
                   TextFormField(
                     controller: _nameController,
+                    keyboardType: TextInputType.name,
                     decoration: const InputDecoration(
-                      hintText: 'ชื่อ-นามสกุล',
+                      hintText: 'Full Name (English)',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'กรุณากรอกชื่อ-นามสกุล';
+                      }
+                      // Regex for English name (First Last)
+                      if (!RegExp(r'^[a-zA-Z]+\s+[a-zA-Z]+').hasMatch(value.trim())) {
+                        return 'กรุณากรอกชื่อจริงและนามสกุลเป็นภาษาอังกฤษ';
                       }
                       return null;
                     },
