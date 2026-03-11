@@ -26,6 +26,10 @@ class ChatMessageModel {
   final String? requestDescription;
   final double? requestBudget;
 
+  // Location fields
+  final double? latitude;
+  final double? longitude;
+
   ChatMessageModel({
     required this.id,
     required this.chatId,
@@ -45,6 +49,8 @@ class ChatMessageModel {
     this.requestId,
     this.requestDescription,
     this.requestBudget,
+    this.latitude,
+    this.longitude,
   });
 
   factory ChatMessageModel.fromFirestore(DocumentSnapshot doc) {
@@ -72,6 +78,8 @@ class ChatMessageModel {
       requestBudget: data['requestBudget'] != null
           ? (data['requestBudget'] as num).toDouble()
           : null,
+      latitude: data['latitude'] != null ? (data['latitude'] as num).toDouble() : null,
+      longitude: data['longitude'] != null ? (data['longitude'] as num).toDouble() : null,
     );
   }
 
@@ -94,6 +102,8 @@ class ChatMessageModel {
       'requestId': requestId,
       'requestDescription': requestDescription,
       'requestBudget': requestBudget,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

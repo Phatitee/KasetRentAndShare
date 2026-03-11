@@ -20,7 +20,10 @@ import '../../models/user_model.dart';
 
 import 'package:signature/signature.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/cloudinary_service.dart';
+import 'location_picker_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -393,6 +396,17 @@ class _ChatScreenState extends State<ChatScreen> {
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
+                  child: Icon(Icons.location_on, color: AppTheme.primaryTeal),
+                ),
+                title: const Text('แชร์ตำแหน่งนัดหมาย'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _sendLocation();
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.primaryTeal.withOpacity(0.1),
                   child: Icon(Icons.description, color: AppTheme.primaryTeal),
                 ),
                 title: Text(l.tr('create_contract')),
@@ -438,6 +452,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // Contract message
     if (message.messageType == 'contract') {
       return _buildContractMessage(message, isMe);
+    }
+
+    // Location message
+    if (message.messageType == 'location') {
+      return _buildLocationMessage(message, isMe);
     }
 
     return Padding(
@@ -1285,6 +1304,155 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+  }
+
+  Future<void> _sendLocation() async {
+    final LatLng? pickedLocation = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LocationPickerScreen(),
+      ),
+    );
+
+    if (pickedLocation != null) {
+      setState(() => _isSending = true);
+
+      try {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final firestoreService = FirestoreService();
+
+        final message = ChatMessageModel(
+          id: '',
+          chatId: widget.chatId,
+          senderId: authService.currentUser!.uid,
+          message: '📍 นัดรับ/คืนของ: ดูตำแหน่งในแผนที่',
+          timestamp: DateTime.now(),
+          messageType: 'location',
+          latitude: pickedLocation.latitude,
+          longitude: pickedLocation.longitude,
+        );
+
+        await firestoreService.sendMessage(message);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSending = false);
+        }
+      }
+    }
+  }
+
+  Widget _buildLocationMessage(ChatMessageModel message, bool isMe) {
+    if (message.latitude == null || message.longitude == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
+              radius: 16,
+              fontSize: 12,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final url = 'https://www.google.com/maps/search/?api=1&query=${message.latitude},${message.longitude}';
+                    if (await canLaunchUrl(Uri.parse(url))) {
+                      await launchUrl(Uri.parse(url));
+                    }
+                  },
+                  child: Container(
+                    width: 240,
+                    decoration: BoxDecoration(
+                      color: isMe ? AppTheme.primaryTeal : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isMe ? null : Border.all(color: AppTheme.divider),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                          child: Container(
+                            height: 120,
+                            width: double.infinity,
+                            color: Colors.grey[200],
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Placeholder image or mini map
+                                Icon(Icons.map_outlined, size: 48, color: AppTheme.primaryTeal.withOpacity(0.5)),
+                                const Positioned(
+                                  child: Icon(Icons.location_on, color: Colors.red, size: 32),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'นัดรับ/คืนของ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: isMe ? Colors.white : AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'แตะเพื่อเปิดในแผนที่',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isMe ? Colors.white.withOpacity(0.8) : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTime(message.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textHint,
+                        fontSize: 11,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDateDivider(DateTime date) {

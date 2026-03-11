@@ -47,6 +47,7 @@ dependencies:
   google_maps_flutter: ^2.9.0
   geolocator: ^13.0.2
   geocoding: ^3.0.0
+  url_launcher: ^6.3.1
   
   # Image Handling
   image_picker: ^1.1.2
