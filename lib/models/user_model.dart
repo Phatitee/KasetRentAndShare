@@ -4,14 +4,15 @@ class UserModel {
   final String uid;
   final String email;
   final String name;
-  final String? photoUrl; // Google profile photo
+  final String? photoUrl;
   final double rating;
   final int totalRentals;
   final int totalReviews;
-  final bool isVerified; // Add this field
+  final bool isVerified;
   final DateTime createdAt;
-
-  String get fullName => name;
+  
+  // New safety field
+  final List<String> blockedUids;
 
   UserModel({
     required this.uid,
@@ -21,8 +22,9 @@ class UserModel {
     this.rating = 0.0,
     this.totalRentals = 0,
     this.totalReviews = 0,
-    this.isVerified = false, // Default to false
+    this.isVerified = false,
     required this.createdAt,
+    this.blockedUids = const [],
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -37,6 +39,7 @@ class UserModel {
       totalReviews: data['totalReviews'] ?? 0,
       isVerified: data['isVerified'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      blockedUids: List<String>.from(data['blockedUids'] ?? []),
     );
   }
 
@@ -50,6 +53,7 @@ class UserModel {
       'totalReviews': totalReviews,
       'isVerified': isVerified,
       'createdAt': Timestamp.fromDate(createdAt),
+      'blockedUids': blockedUids,
     };
   }
 
@@ -63,6 +67,7 @@ class UserModel {
     int? totalReviews,
     bool? isVerified,
     DateTime? createdAt,
+    List<String>? blockedUids,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -74,6 +79,9 @@ class UserModel {
       totalReviews: totalReviews ?? this.totalReviews,
       isVerified: isVerified ?? this.isVerified,
       createdAt: createdAt ?? this.createdAt,
+      blockedUids: blockedUids ?? this.blockedUids,
     );
   }
+
+  String get fullName => name;
 }
