@@ -10,7 +10,7 @@ class ChatMessageModel {
   final bool isRead;
 
   // Item card fields
-  final String messageType; // 'text' | 'image' | 'item_card' | 'contract' | 'request_card'
+  final String messageType; // 'text' | 'image' | 'item_card' | 'contract' | 'request_card' | 'status'
   final String? itemId;
   final String? itemName;
   final String? itemImageUrl;

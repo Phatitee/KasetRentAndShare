@@ -85,6 +85,12 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
         await FirestoreService().updateContract(_contract.id, {
           'paymentSlipUrl': url,
         });
+
+        // Send status message to chat
+        if (_contract.chatId.isNotEmpty) {
+          await FirestoreService().sendSystemMessage(_contract.chatId, 'ผู้เช่าอัปโหลดสลิปการโอนเงินแล้ว');
+        }
+
         _refreshContract();
         _showSuccess('อัปโหลดสลิปสำเร็จ รอยืนยันจากผู้ให้เช่า');
       }
@@ -102,6 +108,12 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
         'paymentStatus': 'paid',
         'paymentConfirmedAt': Timestamp.now(),
       });
+
+      // Send status message to chat
+      if (_contract.chatId.isNotEmpty) {
+        await FirestoreService().sendSystemMessage(_contract.chatId, 'ผู้ให้เช่ายืนยันการรับเงินเรียบร้อยแล้ว');
+      }
+
       _refreshContract();
       _showSuccess('ยืนยันการชำระเงินสำเร็จ');
     } catch (e) {
@@ -141,11 +153,23 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
       };
 
       // Both confirmed?
+      bool bothConfirmed = false;
       if ((isOwner && _contract.renterPickupConfirmed) || (!isOwner && _contract.ownerPickupConfirmed)) {
         updateData['pickupConfirmedAt'] = Timestamp.now();
+        bothConfirmed = true;
       }
 
       await FirestoreService().updateContract(_contract.id, updateData);
+
+      // Send status message to chat
+      if (_contract.chatId.isNotEmpty) {
+        final role = isOwner ? 'ผู้ให้เช่า' : 'ผู้เช่า';
+        await FirestoreService().sendSystemMessage(_contract.chatId, 'ยืนยันการรับของแล้ว ($role)');
+        if (bothConfirmed) {
+          await FirestoreService().sendSystemMessage(_contract.chatId, 'การรับของเสร็จสมบูรณ์');
+        }
+      }
+
       _refreshContract();
     } catch (e) {
       _showError(e.toString());
@@ -181,13 +205,25 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
         'returnPhotoUrl': photoUrl,
       };
 
+      bool bothConfirmed = false;
       if ((isOwner && _contract.renterReturnConfirmed) || (!isOwner && _contract.ownerReturnConfirmed)) {
         updateData['returnConfirmedAt'] = Timestamp.now();
+        bothConfirmed = true;
         // Show automatic review prompt after state update
         _showReviewPrompt();
       }
 
       await FirestoreService().updateContract(_contract.id, updateData);
+
+      // Send status message to chat
+      if (_contract.chatId.isNotEmpty) {
+        final role = isOwner ? 'ผู้ให้เช่า' : 'ผู้เช่า';
+        await FirestoreService().sendSystemMessage(_contract.chatId, 'ยืนยันการคืนของแล้ว ($role)');
+        if (bothConfirmed) {
+          await FirestoreService().sendSystemMessage(_contract.chatId, 'การคืนของเสร็จสมบูรณ์');
+        }
+      }
+
       _refreshContract();
     } catch (e) {
       _showError(e.toString());

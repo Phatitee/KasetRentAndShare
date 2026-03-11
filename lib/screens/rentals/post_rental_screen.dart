@@ -46,6 +46,16 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     'Fair',
   ];
 
+  final List<String> _rentalRuleSuggestions = [
+    'ห้ามให้ผู้อื่นนอกเหนือจากชื่อผู้ที่อยู่ในสัญญานำไปใช้งาน',
+    'ห้ามดัดแปลง แก้ไข หรือถอดชิ้นส่วนสินค้า',
+    'ห้ามนำสินค้าไปใช้ในกิจกรรมที่ผิดกฎหมาย',
+    'การคืนสินค้าล่าช้าอาจมีค่าปรับเพิ่มเติมนอกเหนือจากในสัญญา',
+    'กรุณาคืนสินค้าในสภาพเดิมก่อนใช้งาน',
+    'หากนำมาคืนแล้วพบว่าสินค้าชำรุดหรือเสียหาย ผู้เช่าต้องรับผิดชอบค่าเสียหาย',
+    'หากสินค้าสูญหาย ผู้เช่าต้องชดใช้ตามมูลค่าสินค้า',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +71,25 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
       // Handling remote images deletion/addition in edit mode can be complex,
       // so for now we either keep existing or replace entirely if new are picked.
     }
+  }
+
+  void _addSuggestion(String rule) {
+    final currentText = _descriptionController.text.trim();
+    String newText;
+    
+    if (currentText.isEmpty) {
+      newText = '- $rule';
+    } else {
+      newText = '$currentText\n- $rule';
+    }
+
+    setState(() {
+      _descriptionController.text = newText;
+      // Move cursor to the end
+      _descriptionController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _descriptionController.text.length),
+      );
+    });
   }
 
   @override
@@ -510,6 +539,32 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
+            Text(
+              "กฎการเช่าที่แนะนำ (คลิกเพื่อเพิ่ม)",
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.primaryTeal.withOpacity(0.8),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 10,
+              runSpacing: 5,
+              children: _rentalRuleSuggestions.map((rule) {
+                return ActionChip(
+                  label: Text(
+                    rule,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: AppTheme.accentMint.withOpacity(0.1),
+                  onPressed: () => _addSuggestion(rule),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _descriptionController,
               maxLines: 5,

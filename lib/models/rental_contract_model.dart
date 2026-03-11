@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RentalContractModel {
   final String id;
+  final String chatId; // Add this
   final String rentalItemId;
   final String itemName;
   final String ownerId;
@@ -43,6 +44,7 @@ class RentalContractModel {
 
   RentalContractModel({
     required this.id,
+    required this.chatId,
     required this.rentalItemId,
     required this.itemName,
     required this.ownerId,
@@ -87,6 +89,7 @@ class RentalContractModel {
     final data = doc.data() as Map<String, dynamic>;
     return RentalContractModel(
       id: doc.id,
+      chatId: data['chatId'] ?? '',
       rentalItemId: data['rentalItemId'] ?? '',
       itemName: data['itemName'] ?? '',
       ownerId: data['ownerId'] ?? '',
@@ -129,6 +132,7 @@ class RentalContractModel {
 
   Map<String, dynamic> toFirestore() {
     return {
+      'chatId': chatId,
       'rentalItemId': rentalItemId,
       'itemName': itemName,
       'ownerId': ownerId,
@@ -171,6 +175,7 @@ class RentalContractModel {
 
   RentalContractModel copyWith({
     String? id,
+    String? chatId,
     String? rentalItemId,
     String? itemName,
     String? ownerId,
@@ -205,6 +210,7 @@ class RentalContractModel {
   }) {
     return RentalContractModel(
       id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
       rentalItemId: rentalItemId ?? this.rentalItemId,
       itemName: itemName ?? this.itemName,
       ownerId: ownerId ?? this.ownerId,

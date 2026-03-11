@@ -419,6 +419,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessageModel message, bool isMe) {
+    // Status message (system)
+    if (message.messageType == 'status') {
+      return _buildStatusMessage(message);
+    }
+
     // Item card message — rendered differently
     if (message.messageType == 'item_card') {
       return _buildItemCardMessage(message, isMe);
@@ -522,6 +527,40 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusMessage(ChatMessageModel message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 32),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  message.message,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
