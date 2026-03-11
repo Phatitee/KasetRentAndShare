@@ -2,7 +2,7 @@ class AppStrings {
   static const Map<String, Map<String, String>> strings = {
     // ─── Bottom Navigation ───
     'nav_home': {'th': 'หน้าหลัก', 'en': 'Home'},
-    'nav_rent': {'th': 'เช่า', 'en': 'Rent'},
+    'nav_rent': {'th': 'โพสต์ของฉัน', 'en': 'My post'},
     'nav_post': {'th': 'โพสต์', 'en': 'Post'},
     'nav_chat': {'th': 'แชท', 'en': 'Chat'},
     'nav_profile': {'th': 'โปรไฟล์', 'en': 'Profile'},

@@ -246,11 +246,6 @@ class _HomeTabState extends State<HomeTab> {
                             fontWeight: FontWeight.w600,
                           ),
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      onPressed: () {},
-                    ),
                   ],
                 ),
               ),

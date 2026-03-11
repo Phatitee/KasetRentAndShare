@@ -6,7 +6,6 @@ import '../models/chat_message_model.dart';
 import '../models/user_model.dart';
 import '../models/rental_contract_model.dart';
 import '../models/review_model.dart';
-import '../models/notification_model.dart';
 import 'cloudinary_service.dart';
 
 class FirestoreService {
@@ -15,14 +14,49 @@ class FirestoreService {
 
   // ========== User Operations ==========
 
-  /// Get user by ID
+  /// Get user by ID (with proactive verification check)
   Future<UserModel?> getUser(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        return UserModel.fromFirestore(doc);
+      if (!doc.exists) return null;
+
+      final data = doc.data()!;
+      bool isVerified = data['isVerified'] ?? false;
+      int totalRentals = data['totalRentals'] ?? 0;
+
+      // Proactive sync: If not verified in DB, check if they should be
+      if (!isVerified) {
+        final ownerCountRes = await _firestore
+            .collection('contracts')
+            .where('ownerId', isEqualTo: userId)
+            .where('returnConfirmedAt', isNull: false)
+            .count()
+            .get();
+        
+        final renterCountRes = await _firestore
+            .collection('contracts')
+            .where('renterId', isEqualTo: userId)
+            .where('returnConfirmedAt', isNull: false)
+            .count()
+            .get();
+
+        final actualCount = (ownerCountRes.count ?? 0) + (renterCountRes.count ?? 0);
+
+        if (actualCount > 0) {
+          isVerified = true;
+          totalRentals = actualCount;
+          // Update DB in background
+          _firestore.collection('users').doc(userId).update({
+            'isVerified': true,
+            'totalRentals': actualCount,
+          });
+        }
       }
-      return null;
+
+      return UserModel.fromFirestore(doc).copyWith(
+        isVerified: isVerified,
+        totalRentals: totalRentals,
+      );
     } catch (e) {
       print('Error getting user: $e');
       return null;
@@ -598,12 +632,70 @@ class FirestoreService {
         });
   }
 
-  /// Update contract (for GPS confirmation)
+  /// Update contract (for GPS confirmation and status updates)
   Future<void> updateContract(String id, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('contracts').doc(id).update(data);
+
+      // Check if the contract was just completed
+      if (data.containsKey('returnConfirmedAt')) {
+        final contract = await getContract(id);
+        if (contract != null) {
+          // Both parties (owner and renter) become verified after completing one contract
+          await _verifyUserAfterContract(contract.ownerId);
+          await _verifyUserAfterContract(contract.renterId);
+        }
+      }
     } catch (e) {
       throw Exception('Failed to update contract: $e');
+    }
+  }
+
+  /// Sync and update user verification based on past completed contracts
+  Future<void> syncUserVerificationStatus(String userId) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) return;
+
+      final userData = userDoc.data()!;
+      final bool currentlyVerified = userData['isVerified'] ?? false;
+
+      // Query for completed contracts where user was either owner or renter
+      final ownerContracts = await _firestore
+          .collection('contracts')
+          .where('ownerId', isEqualTo: userId)
+          .where('returnConfirmedAt', isNull: false)
+          .get();
+
+      final renterContracts = await _firestore
+          .collection('contracts')
+          .where('renterId', isEqualTo: userId)
+          .where('returnConfirmedAt', isNull: false)
+          .get();
+
+      final totalCompleted = ownerContracts.docs.length + renterContracts.docs.length;
+
+      // If they have completed contracts but status is incorrect, sync it!
+      if (totalCompleted > 0 || currentlyVerified != (totalCompleted > 0)) {
+        await _firestore.collection('users').doc(userId).update({
+          'isVerified': totalCompleted > 0,
+          'totalRentals': totalCompleted,
+        });
+      }
+    } catch (e) {
+      print('Error syncing verification status: $e');
+    }
+  }
+
+  /// Helper to verify user and increment rental count
+  Future<void> _verifyUserAfterContract(String userId) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'isVerified': true,
+        'totalRentals': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print('Error verifying user $userId: $e');
     }
   }
 
@@ -671,69 +763,5 @@ class FirestoreService {
     } catch (e) {
       print('Error updating user rating: $e');
     }
-  }
-
-  // ========== Notification Operations ==========
-
-  /// Create a notification
-  Future<String> createNotification(NotificationModel notification) async {
-    try {
-      final docRef = await _firestore
-          .collection('notifications')
-          .add(notification.toFirestore());
-      return docRef.id;
-    } catch (e) {
-      throw Exception('Failed to create notification: $e');
-    }
-  }
-
-  /// Get notifications for a user
-  Stream<List<NotificationModel>> getUserNotifications(String userId) {
-    return _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => NotificationModel.fromFirestore(doc))
-            .toList());
-  }
-
-  /// Mark a notification as read
-  Future<void> markNotificationRead(String notificationId) async {
-    await _firestore
-        .collection('notifications')
-        .doc(notificationId)
-        .update({'isRead': true});
-  }
-
-  /// Mark all notifications as read
-  Future<void> markAllNotificationsRead(String userId) async {
-    final batch = _firestore.batch();
-    final snapshot = await _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
-        .get();
-    for (final doc in snapshot.docs) {
-      batch.update(doc.reference, {'isRead': true});
-    }
-    await batch.commit();
-  }
-
-  /// Get unread notification count as stream
-  Stream<int> getUnreadNotificationCount(String userId) {
-    return _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  /// Delete a notification
-  Future<void> deleteNotification(String notificationId) async {
-    await _firestore.collection('notifications').doc(notificationId).delete();
   }
 }
