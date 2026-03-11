@@ -8,13 +8,18 @@ import '../../config/theme.dart';
 import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
-import '../../services/cloudinary_service.dart';
 import '../../models/chat_message_model.dart';
 import '../../models/rental_item_model.dart';
 import '../../models/rental_request_model.dart';
 import '../rentals/item_detail_screen.dart';
 import '../rentals/request_details_screen.dart';
 import 'create_contract_screen.dart';
+import '../../widgets/user_avatar.dart';
+import '../../models/user_model.dart';
+
+import 'package:signature/signature.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../services/cloudinary_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -40,11 +45,22 @@ class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+  UserModel? _otherUser;
 
   @override
   void initState() {
     super.initState();
+    _loadOtherUserData();
     _markAsRead();
+  }
+
+  Future<void> _loadOtherUserData() async {
+    final userData = await FirestoreService().getUserData(widget.otherUserId);
+    if (mounted) {
+      setState(() {
+        _otherUser = userData;
+      });
+    }
   }
 
   void _markAsRead() {
@@ -417,17 +433,11 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
               radius: 16,
-              backgroundColor: AppTheme.secondaryGreen,
-              child: Text(
-                widget.otherUserName.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              fontSize: 12,
             ),
             const SizedBox(width: 8),
           ],
@@ -518,16 +528,11 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
               radius: 16,
-              backgroundColor: AppTheme.secondaryGreen,
-              child: Text(
-                widget.otherUserName.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold),
-              ),
+              fontSize: 12,
             ),
             const SizedBox(width: 8),
           ],
@@ -689,16 +694,11 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
               radius: 16,
-              backgroundColor: AppTheme.secondaryGreen,
-              child: Text(
-                widget.otherUserName.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold),
-              ),
+              fontSize: 12,
             ),
             const SizedBox(width: 8),
           ],
@@ -878,17 +878,11 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
               radius: 16,
-              backgroundColor: AppTheme.secondaryGreen,
-              child: Text(
-                widget.otherUserName.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              fontSize: 12,
             ),
             const SizedBox(width: 8),
           ],
@@ -1056,16 +1050,150 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _updateContractStatus(ChatMessageModel message, String newStatus) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    if (newStatus == 'accepted') {
+      _showRenterSignatureDialog(message);
+    } else {
+      try {
+        await FirestoreService().updateMessageContractStatus(
+          widget.chatId,
+          message.id,
+          newStatus,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: AppTheme.error),
+          );
+        }
+      }
+    }
+  }
+
+  void _showRenterSignatureDialog(ChatMessageModel message) {
+    final SignatureController signatureController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('เซ็นชื่อเพื่อยอมรับสัญญา (Renter Signature)'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Signature(
+                    controller: signatureController,
+                    height: 200,
+                    backgroundColor: Colors.grey[50]!,
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => signatureController.clear(),
+                    child: const Text('ล้างลายเซ็น'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              signatureController.dispose();
+              Navigator.pop(context);
+            },
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (signatureController.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('กรุณาเซ็นชื่อก่อนยอมรับ')),
+                );
+                return;
+              }
+
+              final sigBytes = await signatureController.toPngBytes();
+              if (mounted) Navigator.pop(context); // Close dialog
+
+              if (sigBytes != null && mounted) {
+                _handleAcceptContract(message, sigBytes);
+              }
+              signatureController.dispose();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryTeal),
+            child: const Text('ยอมรับและเซ็นสัญญา'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAcceptContract(ChatMessageModel message, List<int> sigBytes) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
     try {
-      await FirestoreService().updateMessageContractStatus(
+      // 1. Upload signature to Cloudinary
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/renter_sig_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(sigBytes);
+
+      final cloudinary = CloudinaryService();
+      final signatureUrl = await cloudinary.uploadImage(file, 'contract_signatures');
+
+      // 2. Confirm Contract
+      await FirestoreService().confirmContract(
         widget.chatId,
-        message.id,
-        newStatus,
+        message,
+        currentUserId,
+        signatureUrl,
       );
+
+      if (mounted) {
+        if (Navigator.canPop(context)) Navigator.pop(context); // Remove loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('สัญญาได้รับการยืนยันแล้ว! คุณสามารถดูได้ที่เมนูสัญญา'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
+        if (Navigator.canPop(context)) Navigator.pop(context); // Remove loading
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     }
