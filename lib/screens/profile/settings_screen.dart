@@ -94,49 +94,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 const SizedBox(height: 16),
 
-                // ─── Notifications ───
-                _SectionHeader(title: l.tr('notification_settings')),
-                Container(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(13),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        title: Text(l.tr('notification_rental')),
-                        value: _rentalNotif,
-                        activeColor: AppTheme.primaryTeal,
-                        onChanged: (value) {
-                          setState(() => _rentalNotif = value);
-                          _saveNotifPref('notif_rental', value);
-                        },
-                      ),
-                      const Divider(height: 1),
-                      SwitchListTile(
-                        title: Text(l.tr('notification_chat')),
-                        value: _chatNotif,
-                        activeColor: AppTheme.primaryTeal,
-                        onChanged: (value) {
-                          setState(() => _chatNotif = value);
-                          _saveNotifPref('notif_chat', value);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
                 // ─── App Info ───
                 _SectionHeader(title: l.tr('app_info')),
                 Container(

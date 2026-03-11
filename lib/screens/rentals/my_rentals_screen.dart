@@ -37,7 +37,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Rentals'),
+        title: const Text('My Posts'),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppTheme.primaryTeal,

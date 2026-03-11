@@ -29,12 +29,13 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
   bool _isLoading = false;
 
   final List<String> _categories = [
+    'Camera',
     'Electronics',
-    'Tools',
+    'Fashion',
     'Books',
     'Sports',
-    'Clothing',
-    'Other',
+    'Music',
+    'Others',
   ];
 
   @override
@@ -63,13 +64,18 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
     final now = DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.light().copyWith(
+          data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
               primary: AppTheme.primaryTeal,
+              onPrimary: Colors.white,
+              onSurface: AppTheme.textPrimary,
             ),
           ),
           child: child!,
@@ -83,6 +89,43 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
         _endDate = picked.end;
       });
     }
+  }
+
+  void _showCategoryPicker() {
+    final l = AppLocalizations.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l.tr('select_category'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              ..._categories.map((category) => ListTile(
+                    title: Text(category),
+                    trailing: _selectedCategory == category
+                        ? const Icon(Icons.check, color: AppTheme.primaryTeal)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedCategory = category;
+                      });
+                      Navigator.pop(context);
+                    },
+                  )),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleSubmit() async {
@@ -139,9 +182,7 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.requestToEdit != null
-                ? l.tr('request_updated')
-                : l.tr('request_posted')),
+            content: Text(l.tr('request_posted')),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -166,158 +207,189 @@ class _PostRequestScreenState extends State<PostRequestScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(widget.requestToEdit != null
-            ? l.tr('edit_request')
-            : l.tr('post_request')),
-        elevation: 0,
+            ? 'แก้ไขคำขอเช่า'
+            : l.tr('post_request_appbar')),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Item Description
-                    Text(l.tr('what_do_you_need'),
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: InputDecoration(
-                        hintText: l.tr('request_description_hint'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        prefixIcon: Icon(Icons.search, color: AppTheme.primaryTeal),
+          : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Icon Header
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentMint.withOpacity(0.2),
+                        shape: BoxShape.circle,
                       ),
-                      validator: (val) => val == null || val.isEmpty
-                          ? l.tr('field_required')
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Category
-                    Text(l.tr('category'),
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      items: _categories.map((cat) {
-                        return DropdownMenuItem(value: cat, child: Text(cat));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedCategory = val);
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Estimated Budget
-                    Text(l.tr('estimated_budget'),
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _budgetController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: '0.00',
-                        prefixText: '฿ ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return l.tr('field_required');
-                        if (double.tryParse(val) == null) return l.tr('invalid_number');
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Date Range
-                    Text(l.tr('rental_period'),
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => _selectDateRange(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today,
-                                color: AppTheme.primaryTeal, size: 20),
-                            const SizedBox(width: 12),
-                            Text(
-                              _startDate != null && _endDate != null
-                                  ? '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}'
-                                  : l.tr('select_date_range'),
-                              style: TextStyle(
-                                color: _startDate != null
-                                    ? AppTheme.textPrimary
-                                    : AppTheme.textHint,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Icon(
+                        Icons.search_rounded,
+                        size: 40,
+                        color: AppTheme.primaryTeal,
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Additional Details
-                    Text(l.tr('additional_details'),
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _additionalDetailsController,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: l.tr('additional_details_hint'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Submit Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleSubmit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryTeal,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          widget.requestToEdit != null
-                              ? l.tr('update_request')
-                              : l.tr('post_request'),
-                          style: const TextStyle(
-                            fontSize: 16,
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      l.tr('what_looking_for'),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryTeal,
                           ),
-                        ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Item Name / Description
+                  Text(
+                    l.tr('what_looking_for'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: InputDecoration(
+                      hintText: l.tr('what_looking_hint'),
+                    ),
+                    validator: (val) => val == null || val.isEmpty
+                        ? l.tr('required')
+                        : null,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Category
+                  Text(
+                    l.tr('category'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _showCategoryPicker,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.divider),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _selectedCategory.isEmpty
+                                ? l.tr('select_category')
+                                : _selectedCategory,
+                            style: TextStyle(
+                              color: _selectedCategory.isEmpty
+                                  ? AppTheme.textHint
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Estimated Budget
+                  Text(
+                    l.tr('estimated_budget'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _budgetController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      prefixText: '฿ ',
+                      prefixStyle: TextStyle(
+                        color: AppTheme.primaryTeal,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return l.tr('required');
+                      if (double.tryParse(val) == null) return l.tr('invalid_number');
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Date Range
+                  Text(
+                    l.tr('rental_duration'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => _selectDateRange(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.divider),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              color: AppTheme.primaryTeal, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            _startDate != null && _endDate != null
+                                ? '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}'
+                                : l.tr('select_dates'),
+                            style: TextStyle(
+                              color: _startDate != null
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Additional Details
+                  Text(
+                    l.tr('additional_details'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _additionalDetailsController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: l.tr('additional_details_hint'),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Submit Button
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleSubmit,
+                      child: Text(
+                        widget.requestToEdit != null
+                            ? l.tr('save')
+                            : l.tr('post_btn'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
     );

@@ -8,12 +8,10 @@ class UserModel {
   final double rating;
   final int totalRentals;
   final int totalReviews;
+  final bool isVerified; // Add this field
   final DateTime createdAt;
 
   String get fullName => name;
-  
-  // Account is considered verified if registered with @ku.th email
-  bool get isVerified => email.endsWith('@ku.th');
 
   UserModel({
     required this.uid,
@@ -23,6 +21,7 @@ class UserModel {
     this.rating = 0.0,
     this.totalRentals = 0,
     this.totalReviews = 0,
+    this.isVerified = false, // Default to false
     required this.createdAt,
   });
 
@@ -36,6 +35,7 @@ class UserModel {
       rating: (data['rating'] ?? 0.0).toDouble(),
       totalRentals: data['totalRentals'] ?? 0,
       totalReviews: data['totalReviews'] ?? 0,
+      isVerified: data['isVerified'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
@@ -48,6 +48,7 @@ class UserModel {
       'rating': rating,
       'totalRentals': totalRentals,
       'totalReviews': totalReviews,
+      'isVerified': isVerified,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -60,6 +61,7 @@ class UserModel {
     double? rating,
     int? totalRentals,
     int? totalReviews,
+    bool? isVerified,
     DateTime? createdAt,
   }) {
     return UserModel(
@@ -70,6 +72,7 @@ class UserModel {
       rating: rating ?? this.rating,
       totalRentals: totalRentals ?? this.totalRentals,
       totalReviews: totalReviews ?? this.totalReviews,
+      isVerified: isVerified ?? this.isVerified,
       createdAt: createdAt ?? this.createdAt,
     );
   }

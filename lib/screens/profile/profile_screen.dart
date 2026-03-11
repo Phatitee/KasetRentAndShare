@@ -36,9 +36,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final firestoreService = FirestoreService();
 
     if (authService.currentUser != null) {
-      final userData = await firestoreService.getUserData(
-        authService.currentUser!.uid,
-      );
+      final uid = authService.currentUser!.uid;
+      
+      // Sync verification status based on history before/while loading
+      await firestoreService.syncUserVerificationStatus(uid);
+      
+      final userData = await firestoreService.getUserData(uid);
       if (mounted) {
         setState(() {
           _user = userData;
@@ -380,18 +383,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _loadUserData(); // refresh profile
                 }
               }
-            },
-          ),
-          const Divider(height: 1),
-          _buildMenuItem(
-            icon: Icons.notifications_outlined,
-            title: l.tr('notifications'),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l.tr('notification_coming_soon')),
-                ),
-              );
             },
           ),
           const Divider(height: 1),

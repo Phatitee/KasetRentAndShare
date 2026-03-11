@@ -232,16 +232,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    widget.user.isVerified
-                        ? 'บัญชีของคุณได้รับการยืนยันแล้ว ✓'
-                        : 'บัญชียังไม่ได้รับการยืนยัน',
-                    style: TextStyle(
-                      color: widget.user.isVerified
-                          ? AppTheme.success
-                          : AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.user.isVerified
+                            ? 'บัญชีของคุณได้รับการยืนยันแล้ว ✓'
+                            : 'บัญชียังไม่ได้รับการยืนยัน',
+                        style: TextStyle(
+                          color: widget.user.isVerified
+                              ? AppTheme.success
+                              : AppTheme.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (!widget.user.isVerified)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'คุณจะได้รับการยืนยันโดยอัตโนมัติหลังจากทำสัญญาเช่าสำเร็จครั้งแรก',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
