@@ -11,16 +11,19 @@ import '../../services/firestore_service.dart';
 import '../../services/cloudinary_service.dart';
 import '../../models/chat_message_model.dart';
 import '../../models/rental_item_model.dart';
+import '../../models/rental_request_model.dart';
 
 class CreateContractScreen extends StatefulWidget {
   final String chatId;
-  final RentalItemModel? rentalItem; // now optional
+  final RentalItemModel? rentalItem;
+  final RentalRequestModel? rentalRequest;
   final String otherUserId;
 
   const CreateContractScreen({
     super.key,
     required this.chatId,
     this.rentalItem,
+    this.rentalRequest,
     required this.otherUserId,
   });
 
@@ -54,6 +57,12 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
       _itemNameController.text = widget.rentalItem!.itemName;
       _depositController.text = widget.rentalItem!.deposit.toStringAsFixed(0);
       _totalPriceController.text = widget.rentalItem!.dailyRate.toStringAsFixed(0);
+    } else if (widget.rentalRequest != null) {
+      _itemNameController.text = widget.rentalRequest!.itemDescription;
+      _depositController.text = '0'; // Default for requests
+      _totalPriceController.text = widget.rentalRequest!.estimatedBudget.toStringAsFixed(0);
+      _startDate = widget.rentalRequest!.startDate;
+      _endDate = widget.rentalRequest!.endDate;
     }
   }
 
