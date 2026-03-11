@@ -336,25 +336,30 @@ class FirestoreService {
     String? rentalRequestName,
   }) async {
     try {
-      // Check if chat already exists
+      // Check if chat already exists between THESE TWO users
       final existingChats = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId1)
           .get();
 
       for (final doc in existingChats.docs) {
-        final chat = ChatModel.fromFirestore(doc);
-        if (chat.participants.contains(userId2)) {
+        final chatData = doc.data();
+        final participants = List<String>.from(chatData['participants'] ?? []);
+        
+        if (participants.contains(userId2)) {
           // If this is an old chat missing rental info, patch it!
           final updates = <String, dynamic>{};
-          if (rentalItemId != null && chat.rentalItemId == null) {
+          
+          if (rentalItemId != null && chatData['rentalItemId'] == null) {
             updates['rentalItemId'] = rentalItemId;
             updates['rentalItemName'] = rentalItemName;
           }
-          if (rentalRequestId != null && chat.rentalRequestId == null) {
+          
+          if (rentalRequestId != null && chatData['rentalRequestId'] == null) {
             updates['rentalRequestId'] = rentalRequestId;
             updates['rentalRequestName'] = rentalRequestName;
           }
+          
           if (updates.isNotEmpty) {
             await _firestore.collection('chats').doc(doc.id).update(updates);
           }
