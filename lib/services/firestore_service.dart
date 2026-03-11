@@ -29,6 +29,8 @@ class FirestoreService {
     }
   }
 
+  /// Get user data by UID (Alias for getUser)
+  Future<UserModel?> getUserData(String uid) => getUser(uid);
 
   // ========== Rental Item Operations ==========
 
@@ -119,22 +121,6 @@ class FirestoreService {
       await _firestore.collection('rental_items').doc(id).delete();
     } catch (e) {
       throw Exception('Failed to delete rental item: $e');
-    }
-  }
-
-  // ========== User Operations ==========
-
-  /// Get user data by UID
-  Future<UserModel?> getUserData(String uid) async {
-    try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-      if (doc.exists) {
-        return UserModel.fromFirestore(doc);
-      }
-      return null;
-    } catch (e) {
-      print('Error getting user data: $e');
-      return null;
     }
   }
 
@@ -467,7 +453,6 @@ class FirestoreService {
       if (item == null) throw Exception('Rental item not found');
 
       // 3. Determine roles (Owner vs Renter)
-      // The item owner is the owner. The other person in the chat is the renter.
       final ownerId = item.ownerId;
       
       final chatDoc = await _firestore.collection('chats').doc(chatId).get();
@@ -496,11 +481,11 @@ class FirestoreService {
         renterName: renter.fullName,
         ownerSignatureUrl: ownerSignatureUrl,
         renterSignatureUrl: renterSignatureUrl,
-        startDate: DateTime.parse(contractData['startDate']),
-        endDate: DateTime.parse(contractData['endDate']),
+        startDate: DateTime.tryParse(contractData['startDate'] ?? '') ?? DateTime.now(),
+        endDate: DateTime.tryParse(contractData['endDate'] ?? '') ?? DateTime.now().add(const Duration(days: 1)),
         dailyRate: item.dailyRate,
-        totalAmount: (contractData['totalPrice'] as num).toDouble(),
-        deposit: (contractData['deposit'] as num).toDouble(),
+        totalAmount: (contractData['totalPrice'] as num?)?.toDouble() ?? 0.0,
+        deposit: (contractData['deposit'] as num?)?.toDouble() ?? 0.0,
         condition: item.condition,
         createdAt: DateTime.now(),
       );
@@ -545,33 +530,6 @@ class FirestoreService {
 
   /// Get user's contracts (as owner or renter)
   Stream<List<RentalContractModel>> getUserContracts(String userId) {
-    // Listen to BOTH where user is owner OR renter.
-    // Since Firestore doesn't support logical OR across different fields in a simple way for real-time streams
-    // without a combined index or multiple streams, we'll use a slightly better approach than before.
-    
-    // Stream 1: where ownerId == userId
-    final ownerStream = _firestore
-        .collection('contracts')
-        .where('ownerId', isEqualTo: userId)
-        .snapshots();
-        
-    // Stream 2: where renterId == userId
-    final renterStream = _firestore
-        .collection('contracts')
-        .where('renterId', isEqualTo: userId)
-        .snapshots();
-
-    // We can combine these using RxDart if available, but since we want to avoid extra dependencies,
-    // we use StreamGroup or just a simple logical combination.
-    // For now, let's keep it simple and fix the reactivity by listening to one and fetching the other,
-    // or just listen to all changes in contracts if the collection is small (not ideal).
-    
-    // Better simple approach for Flutter: Use a combined stream or keep the existing logic but make it more robust.
-    // Actually, the previous logic was ALMOST okay, but it only triggered when the 'owner' part changed.
-    
-    // Let's use a merge strategy if possible, but for now I will fix the contract creation first.
-    // I'll leave the stream as is but fix the creation which is the main culprit.
-    
     return _firestore
         .collection('contracts')
         .snapshots()
