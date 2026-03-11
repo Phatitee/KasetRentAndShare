@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:signature/signature.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import '../../config/theme.dart';
 import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/cloudinary_service.dart';
 import '../../models/chat_message_model.dart';
 import '../../models/rental_item_model.dart';
 
@@ -36,6 +40,12 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
 
   bool _isSubmitting = false;
 
+  final SignatureController _signatureController = SignatureController(
+    penStrokeWidth: 3,
+    penColor: Colors.black,
+    exportBackgroundColor: Colors.white,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +63,7 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
     _depositController.dispose();
     _rulesController.dispose();
     _itemNameController.dispose();
+    _signatureController.dispose();
     super.dispose();
   }
 
@@ -98,12 +109,31 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
       return;
     }
 
+    if (_signatureController.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเซ็นชื่อเพื่อยืนยันสัญญา')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final currentUserId = authService.currentUser!.uid;
 
+      // 1. Process Signature
+      final signatureBytes = await _signatureController.toPngBytes();
+      if (signatureBytes == null) throw Exception('ไม่สามารถประมวลผลลายเซ็นได้');
+      
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/owner_sig_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(signatureBytes);
+
+      final cloudinary = CloudinaryService();
+      final signatureUrl = await cloudinary.uploadImage(file, 'contract_signatures');
+
+      // 2. Prepare Contract Message
       final itemName = _itemNameController.text.trim();
 
       final contractData = {
@@ -114,6 +144,7 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
         'rules': _rulesController.text.trim(),
         'rentalItemId': widget.rentalItem?.id ?? '',
         'rentalItemName': itemName,
+        'ownerSignatureUrl': signatureUrl, // Attach owner signature
       };
 
       final message = ChatMessageModel(
@@ -279,6 +310,40 @@ class _CreateContractScreenState extends State<CreateContractScreen> {
                   if (val == null || val.trim().isEmpty) return l.tr('contract_rules_required');
                   return null;
                 },
+              ),
+              const SizedBox(height: 24),
+
+              // Signature Pad
+              Text('เซ็นชื่อผู้ให้เช่า (Owner Signature)', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppTheme.divider),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      child: Signature(
+                        controller: _signatureController,
+                        height: 150,
+                        backgroundColor: Colors.grey[50]!,
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _signatureController.clear(),
+                          icon: const Icon(Icons.clear, size: 18),
+                          label: const Text('ล้างลายเซ็น'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
