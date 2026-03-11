@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/theme.dart';
+import '../../../widgets/user_avatar.dart';
 
 class ListingCard extends StatelessWidget {
   final String? imageUrl;
   final String itemName;
   final double pricePerDay;
   final String ownerName;
+  final String? ownerPhotoUrl;
   final double ownerRating;
   final bool isVerified;
   final VoidCallback onTap;
@@ -17,6 +19,7 @@ class ListingCard extends StatelessWidget {
     required this.itemName,
     required this.pricePerDay,
     required this.ownerName,
+    this.ownerPhotoUrl,
     required this.ownerRating,
     this.isVerified = false,
     required this.onTap,
@@ -46,7 +49,7 @@ class ListingCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: AspectRatio(
-                aspectRatio: 16 / 9,
+                aspectRatio: 1.0,  // Changed from 16/9 to square to prevent bad cropping
                 child: imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: imageUrl!,
@@ -102,17 +105,11 @@ class ListingCard extends StatelessWidget {
                   // Owner Info
                   Row(
                     children: [
-                      CircleAvatar(
+                      UserAvatar(
+                        photoUrl: ownerPhotoUrl,
+                        name: ownerName,
                         radius: 12,
-                        backgroundColor: AppTheme.primaryTeal,
-                        child: Text(
-                          ownerName[0].toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        fontSize: 10,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
