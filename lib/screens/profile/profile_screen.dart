@@ -9,8 +9,10 @@ import '../../models/user_model.dart';
 import '../auth/login_screen.dart';
 import '../reviews/user_reviews_screen.dart';
 import '../contracts/contracts_list_screen.dart';
+import '../../widgets/user_avatar.dart';
 import 'rental_history_screen.dart';
 import 'settings_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -166,51 +168,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          // Avatar — show Google photo if available, otherwise initial letter
+          // Avatar
           Stack(
             children: [
-              CircleAvatar(
+              UserAvatar(
+                photoUrl: _user?.photoUrl,
+                name: _user?.name ?? 'User',
                 radius: 48,
-                backgroundColor: AppTheme.primaryTeal,
-                child: _user?.photoUrl != null
-                    ? ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: _user!.photoUrl!,
-                          width: 96,
-                          height: 96,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Text(
-                            _getFirstNameFromEmail(_user?.email)
-                                .substring(0, 1)
-                                .toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          errorWidget: (_, __, ___) => Text(
-                            _getFirstNameFromEmail(_user?.email)
-                                .substring(0, 1)
-                                .toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      )
-                    : Text(
-                        _getFirstNameFromEmail(_user?.email)
-                            .substring(0, 1)
-                            .toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                fontSize: 36,
               ),
               if (_user?.isVerified == true)
                 Positioned(
@@ -271,25 +236,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Verify Button (if not verified)
-          if (_user?.isVerified != true)
-            ElevatedButton.icon(
-              onPressed: () {
-                // TODO: Navigate to verification screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('ID verification coming soon!'),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.verified_user, size: 20),
-              label: const Text('Get Verified'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondaryGreen,
-              ),
-            ),
         ],
       ),
     );
@@ -423,7 +369,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildMenuItem(
             icon: Icons.edit,
             title: l.tr('edit_profile'),
-            onTap: () => _showEditProfileDialog(),
+            onTap: () async {
+              if (_user != null) {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EditProfileScreen(user: _user!),
+                  ),
+                );
+                if (result == true) {
+                  _loadUserData(); // refresh profile
+                }
+              }
+            },
           ),
           const Divider(height: 1),
           _buildMenuItem(
@@ -488,67 +445,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _showEditProfileDialog() async {
-    final l = AppLocalizations.of(context);
-    final nameController = TextEditingController(text: _user?.name ?? '');
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.tr('edit_profile')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: l.tr('name_label'),
-                prefixIcon: const Icon(Icons.person_outline),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.tr('cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              if (newName.isEmpty) return;
-              Navigator.pop(context);
-              try {
-                final authService =
-                    Provider.of<AuthService>(context, listen: false);
-                await authService.updateUserData(
-                  authService.currentUser!.uid,
-                  {'name': newName},
-                );
-                // Reload profile
-                await _loadUserData();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l.tr('profile_updated')),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${l.tr('error')}: $e'),
-                      backgroundColor: AppTheme.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Text(l.tr('save')),
-          ),
-        ],
-      ),
-    );
-  }
 }
