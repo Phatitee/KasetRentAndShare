@@ -11,6 +11,9 @@ import '../../models/chat_message_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../chat/chat_screen.dart';
+import '../../widgets/user_avatar.dart';
+import '../reviews/user_reviews_screen.dart';
+import '../../models/review_model.dart';
 
 class RequestDetailsScreen extends StatefulWidget {
   final RentalRequestModel request;
@@ -119,18 +122,80 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
       appBar: AppBar(
         title: const Text('Request Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Show options menu (edit, delete, etc.)
-            },
-          ),
+          if (isRequestOwner)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) async {
+                if (value == 'delete') {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('ลบคำขอ'),
+                      content: const Text('คุณต้องการลบคำขอนี้ใช่ไหม?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('ยกเลิก'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.error,
+                          ),
+                          child: const Text('ลบ'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && mounted) {
+                    try {
+                      await FirestoreService().deleteRentalRequest(widget.request.id);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('ลบคำขอสำเร็จ'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                        Navigator.pop(context);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('เกิดข้อผิดพลาด: $e'),
+                            backgroundColor: AppTheme.error,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('ลบคำขอ', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: ListView(
         children: [
           // Request Details Section
           _buildRequestDetailsSection(),
+
+          const Divider(height: 32, thickness: 8),
+
+          // Reviews Section
+          _buildReviewsSection(),
 
           const Divider(height: 32, thickness: 8),
 
@@ -181,68 +246,75 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
             future: FirestoreService().getUserData(widget.request.requesterId),
             builder: (context, snapshot) {
               final user = snapshot.data;
-              return Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppTheme.primaryTeal,
-                    child: Text(
-                      user?.name.substring(0, 1).toUpperCase() ?? 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+              return InkWell(
+                onTap: () {
+                  if (user != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserReviewsScreen(
+                          userId: user.uid,
+                          userName: user.name,
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      UserAvatar(
+                        photoUrl: user?.photoUrl,
+                        name: user?.name ?? 'U',
+                        radius: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              user?.name ?? 'Loading...',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            Row(
+                              children: [
+                                Text(
+                                  user?.name ?? 'Loading...',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                if (user?.isVerified ?? false) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.verified,
+                                    size: 20,
+                                    color: AppTheme.secondaryGreen,
+                                  ),
+                                ],
+                              ],
                             ),
-                            if (user?.isVerified ?? false) ...[
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified,
-                                size: 20,
-                                color: AppTheme.secondaryGreen,
+                            if (user != null) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    size: 16,
+                                    color: Colors.amber[700],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${user.rating.toStringAsFixed(1)} (${user.totalReviews} reviews)',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
                               ),
                             ],
                           ],
                         ),
-                        if (user != null) ...[
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.star,
-                                size: 16,
-                                color: Colors.amber[700],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                user.rating.toStringAsFixed(1),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                      Icon(Icons.chevron_right, color: AppTheme.textHint),
+                    ],
                   ),
-                  Text(
-                    _getTimeAgo(widget.request.createdAt),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                  ),
-                ],
+                ),
               );
             },
           ),
@@ -250,9 +322,10 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
 
           // Item Name
           Text(
-            widget.request.itemDescription,
+            'ต้องการเช่าสินค้า: ${widget.request.itemDescription}',
             style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 8),
@@ -362,26 +435,6 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
             ),
             const SizedBox(height: 16),
           ],
-
-          // Location
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                size: 20,
-                color: AppTheme.primaryTeal,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.request.locationName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -498,16 +551,10 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
           // Offerer Info
           Row(
             children: [
-              CircleAvatar(
+              UserAvatar(
+                photoUrl: null, // Offer model doesn't have photoUrl yet
+                name: offer.offererName,
                 radius: 20,
-                backgroundColor: AppTheme.secondaryGreen,
-                child: Text(
-                  offer.offererName.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -790,6 +837,128 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
     );
   }
 
+  Widget _buildReviewsSection() {
+    return FutureBuilder<UserModel?>(
+      future: FirestoreService().getUserData(widget.request.requesterId),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (user == null || user.totalReviews == 0) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'User Reviews',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UserReviewsScreen(
+                            userId: user.uid,
+                            userName: user.name,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'View all',
+                      style: TextStyle(color: AppTheme.primaryTeal),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              StreamBuilder<List<ReviewModel>>(
+                stream: FirestoreService().getUserReviews(widget.request.requesterId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final reviews = snapshot.data ?? [];
+                  if (reviews.isEmpty) return const SizedBox.shrink();
+
+                  // Show only the 2 latest reviews
+                  final previewReviews = reviews.take(2).toList();
+
+                  return Column(
+                    children: previewReviews
+                        .map((review) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildReviewPreviewCard(review),
+                            ))
+                        .toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReviewPreviewCard(ReviewModel review) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < review.rating ? Icons.star : Icons.star_border,
+                    color: Colors.amber[700],
+                    size: 14,
+                  );
+                }),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                review.reviewerName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                DateFormat('d MMM yyyy').format(review.createdAt),
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            review.comment,
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getTimeAgo(DateTime dateTime) {
     final difference = DateTime.now().difference(dateTime);
 
@@ -829,7 +998,7 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
         id: '',
         chatId: chatId,
         senderId: currentUser.uid,
-        message: '',
+        message: '🛍️ สนใจข้อเสนอการเช่า: ${widget.request.itemDescription}',
         timestamp: DateTime.now(),
         messageType: 'request_card',
         requestId: widget.request.id,
@@ -838,6 +1007,22 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
       );
 
       await firestoreService.sendMessage(message);
+
+      // Send auto message
+      final autoMsg = '🛍️ สวัสดีครับ/ค่ะ! มาจากการตอบกลับโพสต์: "${widget.request.itemDescription}"\n'
+          'พอดีผม/ฉันมีของที่น่าจะตรงความต้องการของคุณ\n'
+          'ต้องการคุยรายละเอียดเพิ่มเติมครับ/ค่ะ 😊';
+
+      await firestoreService.sendMessage(
+        ChatMessageModel(
+          id: '',
+          chatId: chatId,
+          senderId: currentUser.uid,
+          message: autoMsg,
+          timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+          messageType: 'text',
+        ),
+      );
 
       if (mounted) {
         Navigator.of(context).push(
@@ -871,6 +1056,37 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
         userId,
         rentalRequestId: widget.request.id,
         rentalRequestName: widget.request.itemDescription,
+      );
+
+      // Send request_card message
+      final message = ChatMessageModel(
+        id: '',
+        chatId: chatId,
+        senderId: currentUser.uid,
+        message: '🛍️ สนใจข้อเสนอการเช่า: ${widget.request.itemDescription}',
+        timestamp: DateTime.now(),
+        messageType: 'request_card',
+        requestId: widget.request.id,
+        requestDescription: widget.request.itemDescription,
+        requestBudget: widget.request.estimatedBudget,
+      );
+
+      await firestoreService.sendMessage(message);
+
+      // Send auto message
+      final autoMsg = '🛍️ สวัสดีครับ/ค่ะ! มาจากการตอบกลับโพสต์: "${widget.request.itemDescription}"\n'
+          'พอดีผม/ฉันมีของที่น่าจะตรงความต้องการของคุณ\n'
+          'ต้องการคุยรายละเอียดเพิ่มเติมครับ/ค่ะ 😊';
+
+      await firestoreService.sendMessage(
+        ChatMessageModel(
+          id: '',
+          chatId: chatId,
+          senderId: currentUser.uid,
+          message: autoMsg,
+          timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+          messageType: 'text',
+        ),
       );
 
       if (mounted) {
