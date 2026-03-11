@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
 import 'register_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -102,9 +103,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        // Check email verification for email/password login
+        if (authService.currentUser != null &&
+            !authService.currentUser!.emailVerified) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+                builder: (_) => const EmailVerificationScreen()),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
