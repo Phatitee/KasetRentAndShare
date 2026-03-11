@@ -65,12 +65,17 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10+1
   
+  
   # Notification
   flutter_local_notifications: ^18.0.1
+  
+  # Local Storage
+  shared_preferences: ^2.3.3
   
   # Other utilities
   uuid: ^4.5.1
   path_provider: ^2.1.5
+  signature: ^5.5.0
 
 dev_dependencies:
   flutter_test:
