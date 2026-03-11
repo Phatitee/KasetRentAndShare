@@ -118,26 +118,26 @@ class _ContractCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Status header
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: _getStatusColor(contract.status),
+                color: AppTheme.primaryTeal,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(12),
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    _getStatusIcon(contract.status),
+                  const Icon(
+                    Icons.description_outlined,
                     color: Colors.white,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    _getStatusText(contract.status),
-                    style: const TextStyle(
+                  const Text(
+                    'Rental Contract',
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),
@@ -217,7 +217,7 @@ class _ContractCard extends StatelessWidget {
                   ),
 
                   // GPS Progress
-                  if (contract.status != 'completed') ...[
+                  if (!contract.isReturnComplete) ...[
                     const SizedBox(height: 12),
                     _buildGpsProgress(context),
                   ],
@@ -288,44 +288,5 @@ class _ContractCard extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return AppTheme.statusPending;
-      case 'active':
-        return AppTheme.statusRented;
-      case 'completed':
-        return AppTheme.statusAvailable;
-      default:
-        return AppTheme.textHint;
-    }
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'pending':
-        return Icons.pending;
-      case 'active':
-        return Icons.check_circle;
-      case 'completed':
-        return Icons.done_all;
-      default:
-        return Icons.info;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'pending':
-        return 'Pending Pickup';
-      case 'active':
-        return 'Active Rental';
-      case 'completed':
-        return 'Completed';
-      default:
-        return status;
-    }
   }
 }
