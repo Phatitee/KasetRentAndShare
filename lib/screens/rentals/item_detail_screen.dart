@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,6 +10,10 @@ import '../../models/rental_item_model.dart';
 import '../../models/user_model.dart';
 import '../../models/chat_message_model.dart';
 import '../chat/chat_screen.dart';
+import '../../widgets/user_avatar.dart';
+
+import '../reviews/user_reviews_screen.dart';
+import '../../models/review_model.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final RentalItemModel item;
@@ -234,6 +239,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       _buildOwnerRow(item),
                       const SizedBox(height: 24),
 
+                      // Reviews Preview
+                      _buildReviewsSection(),
+                      const SizedBox(height: 24),
+
                       // Description
                       Text(
                         'Description',
@@ -334,19 +343,32 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             onPageChanged: (i) =>
                 setState(() => _currentImageIndex = i),
             itemBuilder: (context, index) {
-              return CachedNetworkImage(
-                imageUrl: item.imageUrls[index],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                placeholder: (_, __) => Container(
-                  color: AppTheme.backgroundColor,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  color: AppTheme.backgroundColor,
-                  child: Icon(Icons.image_outlined,
-                      size: 64, color: AppTheme.textHint),
-                ),
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Blurred background
+                  CachedNetworkImage(
+                    imageUrl: item.imageUrls[index],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorWidget: (_, __, ___) => Container(color: AppTheme.backgroundColor),
+                  ),
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      color: Colors.black.withOpacity(0.3), // Darken the blurred bg
+                    ),
+                  ),
+                  // Foreground uncropped image
+                  CachedNetworkImage(
+                    imageUrl: item.imageUrls[index],
+                    fit: BoxFit.contain, // Prevent cropping
+                    placeholder: (_, __) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    errorWidget: (_, __, ___) => const Center(
+                      child: Icon(Icons.broken_image, size: 64, color: Colors.white54),
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -387,77 +409,202 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final isOwner = authService.currentUser?.uid == item.ownerId;
 
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: AppTheme.primaryTeal,
-          foregroundImage: _owner?.photoUrl != null
-              ? NetworkImage(_owner!.photoUrl!)
-              : null,
-          child: Text(
-            ownerName.substring(0, 1),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+    return InkWell(
+      onTap: () {
+        if (_owner != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UserReviewsScreen(
+                userId: _owner!.uid,
+                userName: ownerName,
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            UserAvatar(
+              photoUrl: _owner?.photoUrl,
+              name: ownerName,
+              radius: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    ownerName,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Text(
+                        ownerName,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (_owner?.isVerified == true)
+                        Row(
+                          children: [
+                            Icon(Icons.verified,
+                                size: 16, color: AppTheme.secondaryGreen),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Verified',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.secondaryGreen,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  if (_owner?.isVerified == true)
-                    Row(
-                      children: [
-                        Icon(Icons.verified,
-                            size: 16, color: AppTheme.secondaryGreen),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Verified',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.secondaryGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.star, size: 14, color: Colors.amber[700]),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${(_owner?.rating ?? 0.0).toStringAsFixed(1)} (${_owner?.totalReviews ?? 0} reviews)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              Row(
-                children: [
-                  Icon(Icons.star, size: 14, color: Colors.amber[700]),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${(_owner?.rating ?? 0.0).toStringAsFixed(1)} (${_owner?.totalReviews ?? 0} reviews)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+            ),
+            // Chat icon (if not owner)
+            if (!isOwner)
+              IconButton(
+                onPressed: _requestingRental ? null : _requestRental,
+                icon: Icon(Icons.chat_bubble_outline, color: AppTheme.primaryTeal),
+                tooltip: 'Chat with owner',
+              ),
+            Icon(Icons.chevron_right, color: AppTheme.textHint, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewsSection() {
+    if (_owner == null || _owner!.totalReviews == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Reviews',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => UserReviewsScreen(
+                      userId: _owner!.uid,
+                      userName: _getFirstName(_owner?.email, _owner?.name),
+                    ),
                   ),
-                ],
+                );
+              },
+              child: Text(
+                'View all',
+                style: TextStyle(color: AppTheme.primaryTeal),
+              ),
+            ),
+          ],
+        ),
+        StreamBuilder<List<ReviewModel>>(
+          stream: _firestoreService.getUserReviews(widget.item.ownerId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final reviews = snapshot.data ?? [];
+            if (reviews.isEmpty) return const SizedBox.shrink();
+
+            // Show only the 2 latest reviews as preview
+            final previewReviews = reviews.take(2).toList();
+
+            return Column(
+              children: previewReviews
+                  .map((review) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildReviewPreviewCard(review),
+                      ))
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewPreviewCard(ReviewModel review) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < review.rating ? Icons.star : Icons.star_border,
+                    color: Colors.amber[700],
+                    size: 14,
+                  );
+                }),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                review.reviewerName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                DateFormat('d MMM yyyy').format(review.createdAt),
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 10,
+                ),
               ),
             ],
           ),
-        ),
-        // Chat icon (if not owner)
-        if (!isOwner)
-          IconButton(
-            onPressed: _requestingRental ? null : _requestRental,
-            icon: Icon(Icons.chat_bubble_outline, color: AppTheme.primaryTeal),
-            tooltip: 'Chat with owner',
+          const SizedBox(height: 6),
+          Text(
+            review.comment,
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-      ],
+        ],
+      ),
     );
   }
 
