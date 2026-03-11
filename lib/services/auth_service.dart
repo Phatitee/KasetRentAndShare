@@ -46,6 +46,17 @@ class AuthService {
     }
   }
 
+  // Helper method to format name to "First Letter Capitalized"
+  String _formatName(String name) {
+    if (name.isEmpty) return name;
+    
+    // Split by space, filter out empty strings, capitalize first letter of each word
+    return name.trim().split(RegExp(r'\s+')).map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   // Register with email and password
   Future<UserCredential?> registerWithEmail(
     String email,
@@ -57,6 +68,8 @@ class AuthService {
       if (!email.endsWith('@ku.th')) {
         throw Exception('กรุณาใช้อีเมล @ku.th เท่านั้น');
       }
+
+      final formattedName = _formatName(name);
 
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -71,7 +84,7 @@ class AuthService {
         final userModel = UserModel(
           uid: credential.user!.uid,
           email: email,
-          name: name,
+          name: formattedName,
           createdAt: DateTime.now(),
         );
 
@@ -131,17 +144,23 @@ class AuthService {
         final docRef = _firestore.collection('users').doc(user.uid);
         final doc = await docRef.get();
         if (!doc.exists) {
+          final formattedName = _formatName(user.displayName ?? '');
           final userModel = UserModel(
             uid: user.uid,
             email: user.email ?? '',
-            name: user.displayName ?? '',
+            name: formattedName,
             photoUrl: user.photoURL,
             createdAt: DateTime.now(),
           );
           await docRef.set(userModel.toFirestore());
         } else {
-          // Update photoUrl if it changed
-          await docRef.update({'photoUrl': user.photoURL});
+          // Update photoUrl only if it's currently null or a Google URL
+          final currentData = doc.data() as Map<String, dynamic>;
+          final currentPhotoUrl = currentData['photoUrl'] as String?;
+          if (currentPhotoUrl == null ||
+              currentPhotoUrl.contains('googleusercontent.com')) {
+            await docRef.update({'photoUrl': user.photoURL});
+          }
         }
       }
 
