@@ -154,10 +154,11 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final photoField = isOwner ? 'ownerPickupPhotoUrl' : 'renterPickupPhotoUrl';
       final updateData = <String, dynamic>{
         isOwner ? 'ownerPickupConfirmed' : 'renterPickupConfirmed': true,
         isOwner ? 'ownerPickupLocation' : 'renterPickupLocation': myLoc,
-        'pickupPhotoUrl': photoUrl, // Update photo
+        photoField: photoUrl,
       };
 
       // Both confirmed?
@@ -215,10 +216,11 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final photoField = isOwner ? 'ownerReturnPhotoUrl' : 'renterReturnPhotoUrl';
       final updateData = <String, dynamic>{
         isOwner ? 'ownerReturnConfirmed' : 'renterReturnConfirmed': true,
         isOwner ? 'ownerReturnLocation' : 'renterReturnLocation': myLoc,
-        'returnPhotoUrl': photoUrl,
+        photoField: photoUrl,
       };
 
       bool bothConfirmed = false;
@@ -361,9 +363,25 @@ class _ContractDetailsScreenState extends State<ContractDetailsScreen> {
                     _buildReviewBanner(),
                   _buildPaymentSection(isOwner),
                   const SizedBox(height: 16),
-                  _buildFlowStep('1. รับของ (Pickup)', contract.ownerPickupConfirmed, contract.renterPickupConfirmed, contract.pickupPhotoUrl, () => _handlePickup(isOwner), isOwner, enabled: isPaid),
+                  _buildFlowStep(
+                    '1. รับของ (Pickup)', 
+                    contract.ownerPickupConfirmed, 
+                    contract.renterPickupConfirmed, 
+                    isOwner ? contract.ownerPickupPhotoUrl : contract.renterPickupPhotoUrl, 
+                    () => _handlePickup(isOwner), 
+                    isOwner, 
+                    enabled: isPaid
+                  ),
                   const SizedBox(height: 16),
-                  _buildFlowStep('2. คืนของ (Return)', contract.ownerReturnConfirmed, contract.renterReturnConfirmed, contract.returnPhotoUrl, () => _handleReturn(isOwner), isOwner, enabled: contract.isPickupComplete),
+                  _buildFlowStep(
+                    '2. คืนของ (Return)', 
+                    contract.ownerReturnConfirmed, 
+                    contract.renterReturnConfirmed, 
+                    isOwner ? contract.ownerReturnPhotoUrl : contract.renterReturnPhotoUrl, 
+                    () => _handleReturn(isOwner), 
+                    isOwner, 
+                    enabled: contract.isPickupComplete
+                  ),
                   const SizedBox(height: 24),
                   _buildInfoSection(),
                   if (contract.isReturnComplete) ...[

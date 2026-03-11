@@ -16,8 +16,11 @@ class PdfGenerator {
     pw.MemoryImage? ownerSignature;
     pw.MemoryImage? renterSignature;
     pw.MemoryImage? paymentSlip;
-    pw.MemoryImage? pickupPhoto;
-    pw.MemoryImage? returnPhoto;
+    
+    pw.MemoryImage? ownerPickupPhoto;
+    pw.MemoryImage? renterPickupPhoto;
+    pw.MemoryImage? ownerReturnPhoto;
+    pw.MemoryImage? renterReturnPhoto;
 
     if (contract.ownerSignatureUrl != null) {
       ownerSignature = await _downloadImage(contract.ownerSignatureUrl!);
@@ -28,11 +31,21 @@ class PdfGenerator {
     if (contract.paymentSlipUrl != null) {
       paymentSlip = await _downloadImage(contract.paymentSlipUrl!);
     }
-    if (contract.pickupPhotoUrl != null) {
-      pickupPhoto = await _downloadImage(contract.pickupPhotoUrl!);
+    
+    // Pickup Photos
+    if (contract.ownerPickupPhotoUrl != null) {
+      ownerPickupPhoto = await _downloadImage(contract.ownerPickupPhotoUrl!);
     }
-    if (contract.returnPhotoUrl != null) {
-      returnPhoto = await _downloadImage(contract.returnPhotoUrl!);
+    if (contract.renterPickupPhotoUrl != null) {
+      renterPickupPhoto = await _downloadImage(contract.renterPickupPhotoUrl!);
+    }
+    
+    // Return Photos
+    if (contract.ownerReturnPhotoUrl != null) {
+      ownerReturnPhoto = await _downloadImage(contract.ownerReturnPhotoUrl!);
+    }
+    if (contract.renterReturnPhotoUrl != null) {
+      renterReturnPhoto = await _downloadImage(contract.renterReturnPhotoUrl!);
     }
 
     pdf.addPage(
@@ -50,9 +63,25 @@ class PdfGenerator {
             pw.SizedBox(height: 15),
             _buildFinancialInfo(contract, boldTtf, paymentSlip),
             pw.SizedBox(height: 20),
-            _buildEvidenceSection('หลักฐานการส่งมอบ (Pickup Evidence)', contract.pickupConfirmedAt, pickupPhoto, boldTtf),
+            _buildEvidenceSection(
+              'หลักฐานการส่งมอบ (Pickup Evidence)', 
+              contract.pickupConfirmedAt, 
+              ownerPickupPhoto, 
+              renterPickupPhoto,
+              boldTtf,
+              contract.ownerName,
+              contract.renterName,
+            ),
             pw.SizedBox(height: 20),
-            _buildEvidenceSection('หลักฐานการคืนสินค้า (Return Evidence)', contract.returnConfirmedAt, returnPhoto, boldTtf),
+            _buildEvidenceSection(
+              'หลักฐานการคืนสินค้า (Return Evidence)', 
+              contract.returnConfirmedAt, 
+              ownerReturnPhoto, 
+              renterReturnPhoto,
+              boldTtf,
+              contract.ownerName,
+              contract.renterName,
+            ),
             pw.SizedBox(height: 30),
             _buildSignatures(contract, boldTtf, ownerSignature, renterSignature),
           ];
@@ -164,20 +193,66 @@ class PdfGenerator {
     );
   }
 
-  static pw.Widget _buildEvidenceSection(String title, DateTime? date, pw.MemoryImage? photo, pw.Font boldFont) {
-    if (date == null && photo == null) return pw.SizedBox();
+  static pw.Widget _buildEvidenceSection(
+    String title, 
+    DateTime? date, 
+    pw.MemoryImage? ownerPhoto, 
+    pw.MemoryImage? renterPhoto,
+    pw.Font boldFont,
+    String ownerName,
+    String renterName,
+  ) {
+    if (date == null && ownerPhoto == null && renterPhoto == null) return pw.SizedBox();
+    
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(title, style: pw.TextStyle(font: boldFont, fontSize: 14)),
         pw.SizedBox(height: 5),
         if (date != null)
-          pw.Text('ยืนยันเมื่อ: ${DateFormat('d MMM yyyy, HH:mm').format(date)}'),
+          pw.Text('ยืนยันเสร็จสมบูรณ์เมื่อ: ${DateFormat('d MMM yyyy, HH:mm').format(date)}'),
         pw.SizedBox(height: 10),
-        if (photo != null)
-          pw.Center(child: pw.Image(photo, height: 150))
-        else
-          pw.Text('ไม่มีรูปถ่ายประกอบ'),
+        
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            // Owner Photo
+            pw.Expanded(
+              child: pw.Column(
+                children: [
+                  pw.Text('รูปจากผู้ให้เช่า ($ownerName)', style: const pw.TextStyle(fontSize: 9)),
+                  pw.SizedBox(height: 5),
+                  if (ownerPhoto != null)
+                    pw.Image(ownerPhoto, height: 120)
+                  else
+                    pw.Container(
+                      height: 120,
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                      child: pw.Center(child: pw.Text('ไม่มีรูป', style: const pw.TextStyle(fontSize: 8))),
+                    ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 10),
+            // Renter Photo
+            pw.Expanded(
+              child: pw.Column(
+                children: [
+                  pw.Text('รูปจากผู้เช่า ($renterName)', style: const pw.TextStyle(fontSize: 9)),
+                  pw.SizedBox(height: 5),
+                  if (renterPhoto != null)
+                    pw.Image(renterPhoto, height: 120)
+                  else
+                    pw.Container(
+                      height: 120,
+                      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                      child: pw.Center(child: pw.Text('ไม่มีรูป', style: const pw.TextStyle(fontSize: 8))),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

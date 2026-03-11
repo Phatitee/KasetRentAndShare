@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RentalContractModel {
   final String id;
-  final String chatId; // Add this
+  final String chatId;
   final String rentalItemId;
   final String itemName;
   final String ownerId;
@@ -27,7 +27,8 @@ class RentalContractModel {
   // Pickup Evidence
   final GeoPoint? ownerPickupLocation;
   final GeoPoint? renterPickupLocation;
-  final String? pickupPhotoUrl;
+  final String? ownerPickupPhotoUrl;
+  final String? renterPickupPhotoUrl;
   final DateTime? pickupConfirmedAt;
   final bool ownerPickupConfirmed;
   final bool renterPickupConfirmed;
@@ -35,7 +36,8 @@ class RentalContractModel {
   // Return Evidence
   final GeoPoint? ownerReturnLocation;
   final GeoPoint? renterReturnLocation;
-  final String? returnPhotoUrl;
+  final String? ownerReturnPhotoUrl;
+  final String? renterReturnPhotoUrl;
   final DateTime? returnConfirmedAt;
   final bool ownerReturnConfirmed;
   final bool renterReturnConfirmed;
@@ -65,13 +67,15 @@ class RentalContractModel {
     this.paymentConfirmedAt,
     this.ownerPickupLocation,
     this.renterPickupLocation,
-    this.pickupPhotoUrl,
+    this.ownerPickupPhotoUrl,
+    this.renterPickupPhotoUrl,
     this.pickupConfirmedAt,
     this.ownerPickupConfirmed = false,
     this.renterPickupConfirmed = false,
     this.ownerReturnLocation,
     this.renterReturnLocation,
-    this.returnPhotoUrl,
+    this.ownerReturnPhotoUrl,
+    this.renterReturnPhotoUrl,
     this.returnConfirmedAt,
     this.ownerReturnConfirmed = false,
     this.renterReturnConfirmed = false,
@@ -112,7 +116,8 @@ class RentalContractModel {
           : null,
       ownerPickupLocation: data['ownerPickupLocation'] as GeoPoint?,
       renterPickupLocation: data['renterPickupLocation'] as GeoPoint?,
-      pickupPhotoUrl: data['pickupPhotoUrl'],
+      ownerPickupPhotoUrl: data['ownerPickupPhotoUrl'],
+      renterPickupPhotoUrl: data['renterPickupPhotoUrl'],
       pickupConfirmedAt: data['pickupConfirmedAt'] != null
           ? (data['pickupConfirmedAt'] as Timestamp).toDate()
           : null,
@@ -120,7 +125,8 @@ class RentalContractModel {
       renterPickupConfirmed: data['renterPickupConfirmed'] ?? false,
       ownerReturnLocation: data['ownerReturnLocation'] as GeoPoint?,
       renterReturnLocation: data['renterReturnLocation'] as GeoPoint?,
-      returnPhotoUrl: data['returnPhotoUrl'],
+      ownerReturnPhotoUrl: data['ownerReturnPhotoUrl'],
+      renterReturnPhotoUrl: data['renterReturnPhotoUrl'],
       returnConfirmedAt: data['returnConfirmedAt'] != null
           ? (data['returnConfirmedAt'] as Timestamp).toDate()
           : null,
@@ -155,7 +161,8 @@ class RentalContractModel {
           : null,
       'ownerPickupLocation': ownerPickupLocation,
       'renterPickupLocation': renterPickupLocation,
-      'pickupPhotoUrl': pickupPhotoUrl,
+      'ownerPickupPhotoUrl': ownerPickupPhotoUrl,
+      'renterPickupPhotoUrl': renterPickupPhotoUrl,
       'pickupConfirmedAt': pickupConfirmedAt != null
           ? Timestamp.fromDate(pickupConfirmedAt!)
           : null,
@@ -163,7 +170,8 @@ class RentalContractModel {
       'renterPickupConfirmed': renterPickupConfirmed,
       'ownerReturnLocation': ownerReturnLocation,
       'renterReturnLocation': renterReturnLocation,
-      'returnPhotoUrl': returnPhotoUrl,
+      'ownerReturnPhotoUrl': ownerReturnPhotoUrl,
+      'renterReturnPhotoUrl': renterReturnPhotoUrl,
       'returnConfirmedAt': returnConfirmedAt != null
           ? Timestamp.fromDate(returnConfirmedAt!)
           : null,
@@ -196,13 +204,15 @@ class RentalContractModel {
     DateTime? paymentConfirmedAt,
     GeoPoint? ownerPickupLocation,
     GeoPoint? renterPickupLocation,
-    String? pickupPhotoUrl,
+    String? ownerPickupPhotoUrl,
+    String? renterPickupPhotoUrl,
     DateTime? pickupConfirmedAt,
     bool? ownerPickupConfirmed,
     bool? renterPickupConfirmed,
     GeoPoint? ownerReturnLocation,
     GeoPoint? renterReturnLocation,
-    String? returnPhotoUrl,
+    String? ownerReturnPhotoUrl,
+    String? renterReturnPhotoUrl,
     DateTime? returnConfirmedAt,
     bool? ownerReturnConfirmed,
     bool? renterReturnConfirmed,
@@ -231,13 +241,15 @@ class RentalContractModel {
       paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
       ownerPickupLocation: ownerPickupLocation ?? this.ownerPickupLocation,
       renterPickupLocation: renterPickupLocation ?? this.renterPickupLocation,
-      pickupPhotoUrl: pickupPhotoUrl ?? this.pickupPhotoUrl,
+      ownerPickupPhotoUrl: ownerPickupPhotoUrl ?? this.ownerPickupPhotoUrl,
+      renterPickupPhotoUrl: renterPickupPhotoUrl ?? this.renterPickupPhotoUrl,
       pickupConfirmedAt: pickupConfirmedAt ?? this.pickupConfirmedAt,
       ownerPickupConfirmed: ownerPickupConfirmed ?? this.ownerPickupConfirmed,
       renterPickupConfirmed: renterPickupConfirmed ?? this.renterPickupConfirmed,
       ownerReturnLocation: ownerReturnLocation ?? this.ownerReturnLocation,
       renterReturnLocation: renterReturnLocation ?? this.renterReturnLocation,
-      returnPhotoUrl: returnPhotoUrl ?? this.returnPhotoUrl,
+      ownerReturnPhotoUrl: ownerReturnPhotoUrl ?? this.ownerReturnPhotoUrl,
+      renterReturnPhotoUrl: renterReturnPhotoUrl ?? this.renterReturnPhotoUrl,
       returnConfirmedAt: returnConfirmedAt ?? this.returnConfirmedAt,
       ownerReturnConfirmed: ownerReturnConfirmed ?? this.ownerReturnConfirmed,
       renterReturnConfirmed: renterReturnConfirmed ?? this.renterReturnConfirmed,
