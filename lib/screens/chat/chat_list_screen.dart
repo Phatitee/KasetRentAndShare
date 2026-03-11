@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/theme.dart';
 import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/chat_message_model.dart';
+import '../../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatelessWidget {
@@ -122,21 +124,11 @@ class _ChatListItem extends StatelessWidget {
               ),
             );
           },
-          leading: CircleAvatar(
+          leading: UserAvatar(
+            photoUrl: otherUser?.photoUrl,
+            name: otherUserName,
             radius: 28,
-            backgroundColor: hasUnread
-                ? AppTheme.primaryTeal
-                : AppTheme.primaryTeal.withOpacity(0.7),
-            child: Text(
-              otherUserName.isNotEmpty 
-                  ? otherUserName.substring(0, 1).toUpperCase() 
-                  : 'U',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            fontSize: 18,
           ),
           title: Row(
             children: [
