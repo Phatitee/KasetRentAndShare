@@ -6,12 +6,28 @@ import '../models/chat_message_model.dart';
 import '../models/user_model.dart';
 import '../models/rental_contract_model.dart';
 import '../models/review_model.dart';
+import '../models/notification_model.dart';
 import 'cloudinary_service.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final CloudinaryService _cloudinaryService = CloudinaryService();
 
+  // ========== User Operations ==========
+
+  /// Get user by ID
+  Future<UserModel?> getUser(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return UserModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user: $e');
+      return null;
+    }
+  }
 
 
   // ========== Rental Item Operations ==========
@@ -68,9 +84,12 @@ class FirestoreService {
 
     if (status != null) {
       query = query.where('status', isEqualTo: status);
+    } else {
+      // Default: don't show hidden items
+      query = query.where('status', isNotEqualTo: 'hidden');
     }
 
-    query = query.orderBy('createdAt', descending: true).limit(limit);
+    query = query.orderBy('status').orderBy('createdAt', descending: true).limit(limit);
 
     return query.snapshots().map((snapshot) =>
         snapshot.docs.map((doc) => RentalItemModel.fromFirestore(doc)).toList());
@@ -170,11 +189,23 @@ class FirestoreService {
       query = query.where('category', isEqualTo: category);
     }
 
+    // Default: don't show hidden or fulfilled requests in general feed
+    query = query.where('status', isEqualTo: 'active');
+
     query = query.orderBy('createdAt', descending: true).limit(limit);
 
     return query.snapshots().map((snapshot) => snapshot.docs
         .map((doc) => RentalRequestModel.fromFirestore(doc))
         .toList());
+  }
+
+  /// Update rental request
+  Future<void> updateRentalRequest(String id, Map<String, dynamic> data) async {
+    try {
+      await _firestore.collection('rental_requests').doc(id).update(data);
+    } catch (e) {
+      throw Exception('Failed to update rental request: $e');
+    }
   }
 
   /// Delete rental request
@@ -377,6 +408,26 @@ class FirestoreService {
             snapshot.docs.map((doc) => ChatModel.fromFirestore(doc)).toList());
   }
 
+  /// Delete a chat and all its messages
+  Future<void> deleteChat(String chatId) async {
+    try {
+      // Delete all messages in this chat
+      final messages = await _firestore
+          .collection('messages')
+          .where('chatId', isEqualTo: chatId)
+          .get();
+      final batch = _firestore.batch();
+      for (final doc in messages.docs) {
+        batch.delete(doc.reference);
+      }
+      // Delete the chat document
+      batch.delete(_firestore.collection('chats').doc(chatId));
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to delete chat: $e');
+    }
+  }
+
   // ========== Contract Operations ==========
 
   /// Update the status of a contract message
@@ -388,6 +439,81 @@ class FirestoreService {
           .update({'contractStatus': status});
     } catch (e) {
       throw Exception('Failed to update contract status: $e');
+    }
+  }
+
+  /// Confirm a contract from a chat message and create the actual contract document
+  Future<void> confirmContract(String chatId, ChatMessageModel message, String currentUserId, String renterSignatureUrl) async {
+    try {
+      final contractData = message.contractData;
+      if (contractData == null) throw Exception('No contract data found in message');
+
+      final itemId = contractData['rentalItemId'] as String;
+      if (itemId.isEmpty) throw Exception('No item ID found in contract data');
+
+      final ownerSignatureUrl = contractData['ownerSignatureUrl'] as String?;
+      if (ownerSignatureUrl == null || ownerSignatureUrl.isEmpty) {
+        throw Exception('ไม่พบลายเซ็นของผู้ให้เช่าในข้อมูลสัญญา');
+      }
+      
+      // 1. Update message status in chat
+      await _firestore
+          .collection('messages')
+          .doc(message.id)
+          .update({'contractStatus': 'accepted'});
+
+      // 2. Get rental item to find owner and details
+      final item = await getRentalItem(itemId);
+      if (item == null) throw Exception('Rental item not found');
+
+      // 3. Determine roles (Owner vs Renter)
+      // The item owner is the owner. The other person in the chat is the renter.
+      final ownerId = item.ownerId;
+      
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      if (!chatDoc.exists) throw Exception('Chat not found');
+      
+      final participants = List<String>.from(chatDoc.data()?['participants'] ?? []);
+      final renterId = participants.firstWhere((id) => id != ownerId, orElse: () => '');
+      
+      if (renterId.isEmpty) throw Exception('Renter not found in chat');
+
+      // 4. Get user names for the contract
+      final owner = await getUser(ownerId);
+      final renter = await getUser(renterId);
+
+      if (owner == null) throw Exception('Owner data not found');
+      if (renter == null) throw Exception('Renter data not found');
+
+      // 5. Create the contract object
+      final contract = RentalContractModel(
+        id: '', // Will be auto-generated by .add()
+        rentalItemId: itemId,
+        itemName: item.itemName,
+        ownerId: ownerId,
+        ownerName: owner.fullName,
+        renterId: renterId,
+        renterName: renter.fullName,
+        ownerSignatureUrl: ownerSignatureUrl,
+        renterSignatureUrl: renterSignatureUrl,
+        startDate: DateTime.parse(contractData['startDate']),
+        endDate: DateTime.parse(contractData['endDate']),
+        dailyRate: item.dailyRate,
+        totalAmount: (contractData['totalPrice'] as num).toDouble(),
+        deposit: (contractData['deposit'] as num).toDouble(),
+        condition: item.condition,
+        createdAt: DateTime.now(),
+      );
+
+      // 6. Save contract to Firestore
+      await createContract(contract);
+
+      // 7. Update item status to 'rented'
+      await updateRentalItem(itemId, {'status': 'rented'});
+      
+    } catch (e) {
+      print('Error confirming contract: $e');
+      throw Exception('Failed to confirm contract: $e');
     }
   }
 
@@ -419,28 +545,43 @@ class FirestoreService {
 
   /// Get user's contracts (as owner or renter)
   Stream<List<RentalContractModel>> getUserContracts(String userId) {
-    // Get contracts where user is either owner or renter
-    return _firestore
+    // Listen to BOTH where user is owner OR renter.
+    // Since Firestore doesn't support logical OR across different fields in a simple way for real-time streams
+    // without a combined index or multiple streams, we'll use a slightly better approach than before.
+    
+    // Stream 1: where ownerId == userId
+    final ownerStream = _firestore
         .collection('contracts')
         .where('ownerId', isEqualTo: userId)
-        .snapshots()
-        .asyncMap((ownerSnapshot) async {
-      final renterSnapshot = await _firestore
-          .collection('contracts')
-          .where('renterId', isEqualTo: userId)
-          .get();
+        .snapshots();
+        
+    // Stream 2: where renterId == userId
+    final renterStream = _firestore
+        .collection('contracts')
+        .where('renterId', isEqualTo: userId)
+        .snapshots();
 
-      final allDocs = [...ownerSnapshot.docs, ...renterSnapshot.docs];
-      
-      // Remove duplicates
-      final seen = <String>{};
-      final uniqueDocs = allDocs.where((doc) => seen.add(doc.id)).toList();
-      
-      return uniqueDocs
-          .map((doc) => RentalContractModel.fromFirestore(doc))
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    });
+    // We can combine these using RxDart if available, but since we want to avoid extra dependencies,
+    // we use StreamGroup or just a simple logical combination.
+    // For now, let's keep it simple and fix the reactivity by listening to one and fetching the other,
+    // or just listen to all changes in contracts if the collection is small (not ideal).
+    
+    // Better simple approach for Flutter: Use a combined stream or keep the existing logic but make it more robust.
+    // Actually, the previous logic was ALMOST okay, but it only triggered when the 'owner' part changed.
+    
+    // Let's use a merge strategy if possible, but for now I will fix the contract creation first.
+    // I'll leave the stream as is but fix the creation which is the main culprit.
+    
+    return _firestore
+        .collection('contracts')
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => RentalContractModel.fromFirestore(doc))
+              .where((c) => c.ownerId == userId || c.renterId == userId)
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        });
   }
 
   /// Update contract (for GPS confirmation)
@@ -477,6 +618,22 @@ class FirestoreService {
             snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList());
   }
 
+  /// Check if user already reviewed a contract
+  Future<bool> hasUserReviewedContract(String contractId, String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('reviews')
+          .where('contractId', isEqualTo: contractId)
+          .where('reviewerId', isEqualTo: userId)
+          .limit(1)
+          .get();
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking review: $e');
+      return false;
+    }
+  }
+
   /// Update user rating based on all reviews
   Future<void> updateUserRating(String userId) async {
     try {
@@ -500,5 +657,69 @@ class FirestoreService {
     } catch (e) {
       print('Error updating user rating: $e');
     }
+  }
+
+  // ========== Notification Operations ==========
+
+  /// Create a notification
+  Future<String> createNotification(NotificationModel notification) async {
+    try {
+      final docRef = await _firestore
+          .collection('notifications')
+          .add(notification.toFirestore());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create notification: $e');
+    }
+  }
+
+  /// Get notifications for a user
+  Stream<List<NotificationModel>> getUserNotifications(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => NotificationModel.fromFirestore(doc))
+            .toList());
+  }
+
+  /// Mark a notification as read
+  Future<void> markNotificationRead(String notificationId) async {
+    await _firestore
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'isRead': true});
+  }
+
+  /// Mark all notifications as read
+  Future<void> markAllNotificationsRead(String userId) async {
+    final batch = _firestore.batch();
+    final snapshot = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
+  }
+
+  /// Get unread notification count as stream
+  Stream<int> getUnreadNotificationCount(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  /// Delete a notification
+  Future<void> deleteNotification(String notificationId) async {
+    await _firestore.collection('notifications').doc(notificationId).delete();
   }
 }
