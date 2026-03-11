@@ -27,6 +27,8 @@ class ChatScreen extends StatefulWidget {
   final String otherUserName;
   final String? rentalItemName;
   final String? rentalItemId;
+  final String? rentalRequestId;
+  final String? rentalRequestName;
 
   const ChatScreen({
     super.key,
@@ -35,6 +37,8 @@ class ChatScreen extends StatefulWidget {
     required this.otherUserName,
     this.rentalItemName,
     this.rentalItemId,
+    this.rentalRequestId,
+    this.rentalRequestName,
   });
 
   @override
@@ -344,9 +348,12 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showAttachmentMenu(BuildContext context) async {
     final l = AppLocalizations.of(context);
     RentalItemModel? currentItem;
+    RentalRequestModel? currentRequest;
 
     if (widget.rentalItemId != null) {
       currentItem = await FirestoreService().getRentalItem(widget.rentalItemId!);
+    } else if (widget.rentalRequestId != null) {
+      currentRequest = await FirestoreService().getRentalRequest(widget.rentalRequestId!);
     }
 
     if (!context.mounted) return;
@@ -396,6 +403,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       builder: (_) => CreateContractScreen(
                         chatId: widget.chatId,
                         rentalItem: currentItem,
+                        rentalRequest: currentRequest,
                         otherUserId: widget.otherUserId,
                       ),
                     ),

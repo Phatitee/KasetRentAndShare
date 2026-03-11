@@ -1031,6 +1031,8 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
               chatId: chatId,
               otherUserId: widget.request.requesterId,
               otherUserName: requesterName,
+              rentalRequestId: widget.request.id,
+              rentalRequestName: widget.request.itemDescription,
             ),
           ),
         );
@@ -1096,6 +1098,8 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
               chatId: chatId,
               otherUserId: userId,
               otherUserName: userName,
+              rentalRequestId: widget.request.id,
+              rentalRequestName: widget.request.itemDescription,
             ),
           ),
         );

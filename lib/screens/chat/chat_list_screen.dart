@@ -120,10 +120,11 @@ class _ChatListItem extends StatelessWidget {
                   otherUserName: otherUserName,
                   rentalItemId: chat.rentalItemId,
                   rentalItemName: chat.rentalItemName,
+                  rentalRequestId: chat.rentalRequestId,
+                  rentalRequestName: chat.rentalRequestName,
                 ),
               ),
-            );
-          },
+            );          },
           leading: UserAvatar(
             photoUrl: otherUser?.photoUrl,
             name: otherUserName,
