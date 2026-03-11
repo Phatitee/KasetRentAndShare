@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../config/locale_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
+import '../../models/user_model.dart';
 import '../../models/rental_item_model.dart';
 import '../../models/rental_request_model.dart';
 import 'widgets/category_button.dart';
@@ -48,15 +49,181 @@ class _HomeTabState extends State<HomeTab> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
+  // Advanced Filters
+  double? _minPrice;
+  double? _maxPrice;
+  String? _filterCondition;
+  bool _showOnlyItems = false;
+  bool _showOnlyRequests = false;
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'ตัวกรอง (Filters)',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _minPrice = null;
+                            _maxPrice = null;
+                            _filterCondition = null;
+                            _showOnlyItems = false;
+                            _showOnlyRequests = false;
+                          });
+                        },
+                        child: Text(
+                          'ล้างค่า',
+                          style: TextStyle(color: AppTheme.error),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  
+                  // Post Type
+                  const Text('ประเภทโพสต์', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('เฉพาะสินค้าเช่า'),
+                        selected: _showOnlyItems,
+                        onSelected: (val) {
+                          setModalState(() {
+                            _showOnlyItems = val;
+                            if (val) _showOnlyRequests = false;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('เฉพาะหาของเช่า'),
+                        selected: _showOnlyRequests,
+                        onSelected: (val) {
+                          setModalState(() {
+                            _showOnlyRequests = val;
+                            if (val) _showOnlyItems = false;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Price Range
+                  const Text('ช่วงราคา (บาท/วัน)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'ขั้นต่ำ',
+                            prefixText: '฿',
+                            filled: true,
+                            fillColor: AppTheme.backgroundColor,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          ),
+                          onChanged: (val) => _minPrice = double.tryParse(val),
+                          controller: TextEditingController(text: _minPrice?.toString() ?? ''),
+                        ),
+                      ),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('-')),
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'สูงสุด',
+                            prefixText: '฿',
+                            filled: true,
+                            fillColor: AppTheme.backgroundColor,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          ),
+                          onChanged: (val) => _maxPrice = double.tryParse(val),
+                          controller: TextEditingController(text: _maxPrice?.toString() ?? ''),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Condition
+                  const Text('สภาพสินค้า', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['Like New (95%+)', 'Good', 'Fair'].map((cond) {
+                      final isSelected = _filterCondition == cond;
+                      return ChoiceChip(
+                        label: Text(cond),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setModalState(() => _filterCondition = selected ? cond : null);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {}); // Refresh HomeTab with new filters
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryTeal),
+                      child: const Text('ใช้ตัวกรอง'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final hasActiveFilters = _minPrice != null || _maxPrice != null || _filterCondition != null || _showOnlyItems || _showOnlyRequests;
+
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -120,30 +287,68 @@ class _HomeTabState extends State<HomeTab> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) {
-                    setState(() => _searchQuery = value.trim().toLowerCase());
-                  },
-                  decoration: InputDecoration(
-                    hintText: l.tr('home_search_hint'),
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppTheme.backgroundColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() => _searchQuery = value.trim().toLowerCase());
+                        },
+                        decoration: InputDecoration(
+                          hintText: l.tr('home_search_hint'),
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 20),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: AppTheme.backgroundColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: hasActiveFilters ? AppTheme.primaryTeal.withAlpha(30) : AppTheme.backgroundColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.tune,
+                              color: hasActiveFilters ? AppTheme.primaryTeal : AppTheme.textPrimary,
+                            ),
+                            onPressed: _showFilterBottomSheet,
+                          ),
+                        ),
+                        if (hasActiveFilters)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: AppTheme.error,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -293,17 +498,50 @@ class _HomeTabState extends State<HomeTab> {
             }
 
             // Combine both lists into feed items
-            final List<FeedItem> feedItems = [];
+            List<FeedItem> feedItems = [];
 
             final items = itemsSnapshot.data ?? [];
-            for (final item in items) {
-              feedItems.add(FeedItem.fromRentalItem(item));
+            if (!_showOnlyRequests) {
+              for (final item in items) {
+                feedItems.add(FeedItem.fromRentalItem(item));
+              }
             }
 
             final requests = requestsSnapshot.data ?? [];
-            for (final request in requests) {
-              feedItems.add(FeedItem.fromRentalRequest(request));
+            if (!_showOnlyItems) {
+              for (final request in requests) {
+                feedItems.add(FeedItem.fromRentalRequest(request));
+              }
             }
+
+            // Apply Advanced Filters
+            feedItems = feedItems.where((fi) {
+              // 1. Keyword Search
+              if (_searchQuery.isNotEmpty) {
+                final query = _searchQuery.toLowerCase();
+                if (fi.isRentalItem) {
+                  final matches = fi.rentalItem!.itemName.toLowerCase().contains(query) ||
+                      fi.rentalItem!.description.toLowerCase().contains(query);
+                  if (!matches) return false;
+                } else {
+                  final matches = fi.rentalRequest!.itemDescription.toLowerCase().contains(query);
+                  if (!matches) return false;
+                }
+              }
+
+              // 2. Price Filter
+              final price = fi.isRentalItem ? fi.rentalItem!.dailyRate : fi.rentalRequest!.estimatedBudget;
+              if (_minPrice != null && price < _minPrice!) return false;
+              if (_maxPrice != null && price > _maxPrice!) return false;
+
+              // 3. Condition Filter (Only for items)
+              if (_filterCondition != null) {
+                if (fi.isRequest) return false;
+                if (fi.rentalItem!.condition != _filterCondition) return false;
+              }
+
+              return true;
+            }).toList();
 
             // Sort by newest first
             feedItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -343,44 +581,42 @@ class _HomeTabState extends State<HomeTab> {
               );
             }
 
-            // Apply search filter
-            final filteredItems = _searchQuery.isEmpty
-                ? feedItems
-                : feedItems.where((fi) {
-                    if (fi.isRentalItem) {
-                      return fi.rentalItem!.itemName.toLowerCase().contains(_searchQuery) ||
-                          fi.rentalItem!.description.toLowerCase().contains(_searchQuery);
-                    } else {
-                      return fi.rentalRequest!.itemDescription.toLowerCase().contains(_searchQuery);
-                    }
-                  }).toList();
-
             return SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final feedItem = filteredItems[index];
+                    final feedItem = feedItems[index];
 
                     if (feedItem.isRentalItem) {
                       final item = feedItem.rentalItem!;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
-                        child: ListingCard(
-                          imageUrl: item.imageUrls.isNotEmpty
-                              ? item.imageUrls.first
-                              : null,
-                          itemName: item.itemName,
-                          pricePerDay: item.dailyRate,
-                          ownerName: AppLocalizations.of(context).tr('owner'),
-                          ownerRating: 5.0,
-                          isVerified: false,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ItemDetailScreen(item: item),
-                              ),
+                        child: FutureBuilder<UserModel?>(
+                          future: _firestoreService.getUser(item.ownerId),
+                          builder: (context, userSnapshot) {
+                            final ownerName = userSnapshot.data?.name ?? AppLocalizations.of(context).tr('owner');
+                            final ownerPhotoUrl = userSnapshot.data?.photoUrl;
+                            final ownerRating = userSnapshot.data?.rating ?? 0.0;
+                            
+                            return ListingCard(
+                              imageUrl: item.imageUrls.isNotEmpty
+                                  ? item.imageUrls.first
+                                  : null,
+                              itemName: item.itemName,
+                              pricePerDay: item.dailyRate,
+                              ownerName: ownerName,
+                              ownerPhotoUrl: ownerPhotoUrl,
+                              ownerRating: ownerRating,
+                              isVerified: userSnapshot.data?.isVerified ?? false,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ItemDetailScreen(item: item),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),
@@ -390,25 +626,12 @@ class _HomeTabState extends State<HomeTab> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: RequestCard(
-                          itemDescription: request.itemDescription,
-                          category: request.category,
-                          budget: request.estimatedBudget,
-                          startDate: request.startDate,
-                          endDate: request.endDate,
-                          locationName: request.locationName,
-                          requesterName: AppLocalizations.of(context).tr('requester'),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => RequestDetailsScreen(request: request),
-                              ),
-                            );
-                          },
+                          request: request,
                         ),
                       );
                     }
                   },
-                  childCount: filteredItems.length,
+                  childCount: feedItems.length,
                 ),
               ),
             );
