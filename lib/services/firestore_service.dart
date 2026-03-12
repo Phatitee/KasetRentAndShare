@@ -110,25 +110,32 @@ class FirestoreService {
   Stream<List<RentalItemModel>> getRentalItems({
     String? category,
     String? status,
-    int limit = 20,
+    int limit = 100, // Increased limit for client-side filtering
   }) {
     Query query = _firestore.collection('rental_items');
 
-    if (category != null && category.isNotEmpty) {
-      query = query.where('category', isEqualTo: category);
-    }
-
     if (status != null) {
       query = query.where('status', isEqualTo: status);
-    } else {
-      // Default: don't show hidden items
-      query = query.where('status', isNotEqualTo: 'hidden');
     }
 
-    query = query.orderBy('status').orderBy('createdAt', descending: true).limit(limit);
+    // Always sort by newest first for the feed
+    query = query.orderBy('createdAt', descending: true).limit(limit);
 
-    return query.snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => RentalItemModel.fromFirestore(doc)).toList());
+    return query.snapshots().map((snapshot) {
+      var items = snapshot.docs.map((doc) => RentalItemModel.fromFirestore(doc)).toList();
+      
+      // Client-side filtering for 'hidden' if status not specified
+      if (status == null) {
+        items = items.where((item) => item.status != 'hidden').toList();
+      }
+      
+      // Client-side filtering for category
+      if (category != null && category.isNotEmpty) {
+        items = items.where((item) => item.category == category).toList();
+      }
+      
+      return items;
+    });
   }
 
   /// Update rental item
@@ -201,22 +208,24 @@ class FirestoreService {
   /// Get all rental requests
   Stream<List<RentalRequestModel>> getRentalRequests({
     String? category,
-    int limit = 20,
+    int limit = 100,
   }) {
     Query query = _firestore.collection('rental_requests');
-
-    if (category != null && category.isNotEmpty) {
-      query = query.where('category', isEqualTo: category);
-    }
 
     // Default: don't show hidden or fulfilled requests in general feed
     query = query.where('status', isEqualTo: 'active');
 
     query = query.orderBy('createdAt', descending: true).limit(limit);
 
-    return query.snapshots().map((snapshot) => snapshot.docs
-        .map((doc) => RentalRequestModel.fromFirestore(doc))
-        .toList());
+    return query.snapshots().map((snapshot) {
+      var requests = snapshot.docs.map((doc) => RentalRequestModel.fromFirestore(doc)).toList();
+      
+      if (category != null && category.isNotEmpty) {
+        requests = requests.where((req) => req.category == category).toList();
+      }
+      
+      return requests;
+    });
   }
 
   /// Update rental request

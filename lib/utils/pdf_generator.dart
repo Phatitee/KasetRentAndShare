@@ -3,6 +3,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart'; // Add this
 import '../models/rental_contract_model.dart';
 
 class PdfGenerator {
@@ -71,6 +72,8 @@ class PdfGenerator {
               boldTtf,
               contract.ownerName,
               contract.renterName,
+              contract.ownerPickupLocation,
+              contract.renterPickupLocation,
             ),
             pw.SizedBox(height: 20),
             _buildEvidenceSection(
@@ -81,6 +84,8 @@ class PdfGenerator {
               boldTtf,
               contract.ownerName,
               contract.renterName,
+              contract.ownerReturnLocation,
+              contract.renterReturnLocation,
             ),
             pw.SizedBox(height: 30),
             _buildSignatures(contract, boldTtf, ownerSignature, renterSignature),
@@ -201,6 +206,8 @@ class PdfGenerator {
     pw.Font boldFont,
     String ownerName,
     String renterName,
+    GeoPoint? ownerLoc,
+    GeoPoint? renterLoc,
   ) {
     if (date == null && ownerPhoto == null && renterPhoto == null) return pw.SizedBox();
     
@@ -220,7 +227,7 @@ class PdfGenerator {
             pw.Expanded(
               child: pw.Column(
                 children: [
-                  pw.Text('รูปจากผู้ให้เช่า ($ownerName)', style: const pw.TextStyle(fontSize: 9)),
+                  pw.Text('รูปจากผู้ให้เช่า ($ownerName)', style: pw.TextStyle(font: boldFont, fontSize: 9)),
                   pw.SizedBox(height: 5),
                   if (ownerPhoto != null)
                     pw.Image(ownerPhoto, height: 120)
@@ -230,6 +237,11 @@ class PdfGenerator {
                       decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
                       child: pw.Center(child: pw.Text('ไม่มีรูป', style: const pw.TextStyle(fontSize: 8))),
                     ),
+                  if (ownerLoc != null) ...[
+                    pw.SizedBox(height: 4),
+                    pw.Text('พิกัด: ${ownerLoc.latitude.toStringAsFixed(6)}, ${ownerLoc.longitude.toStringAsFixed(6)}', 
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                  ],
                 ],
               ),
             ),
@@ -238,7 +250,7 @@ class PdfGenerator {
             pw.Expanded(
               child: pw.Column(
                 children: [
-                  pw.Text('รูปจากผู้เช่า ($renterName)', style: const pw.TextStyle(fontSize: 9)),
+                  pw.Text('รูปจากผู้เช่า ($renterName)', style: pw.TextStyle(font: boldFont, fontSize: 9)),
                   pw.SizedBox(height: 5),
                   if (renterPhoto != null)
                     pw.Image(renterPhoto, height: 120)
@@ -248,6 +260,11 @@ class PdfGenerator {
                       decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
                       child: pw.Center(child: pw.Text('ไม่มีรูป', style: const pw.TextStyle(fontSize: 8))),
                     ),
+                  if (renterLoc != null) ...[
+                    pw.SizedBox(height: 4),
+                    pw.Text('พิกัด: ${renterLoc.latitude.toStringAsFixed(6)}, ${renterLoc.longitude.toStringAsFixed(6)}', 
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                  ],
                 ],
               ),
             ),
