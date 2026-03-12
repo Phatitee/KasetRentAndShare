@@ -236,11 +236,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatsSection() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final firestoreService = FirestoreService();
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
-            'Total Rentals',
+            l.tr('total_rentals_label'),
             '${_user?.totalRentals ?? 0}',
             Icons.shopping_bag_outlined,
           ),
@@ -254,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             builder: (context, snapshot) {
               final count = snapshot.data?.length ?? 0;
               return _buildStatCard(
-                'Items Listed',
+                l.tr('items_listed_label'),
                 '$count',
                 Icons.inventory_2_outlined,
               );

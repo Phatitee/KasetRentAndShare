@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../config/locale_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/rental_item_model.dart';
@@ -9,14 +10,14 @@ import 'package:intl/intl.dart';
 import 'post_rental_screen.dart';
 import 'post_request_screen.dart';
 
-class MyRentalsScreen extends StatefulWidget {
-  const MyRentalsScreen({super.key});
+class MyPostsScreen extends StatefulWidget {
+  const MyPostsScreen({super.key});
 
   @override
-  State<MyRentalsScreen> createState() => _MyRentalsScreenState();
+  State<MyPostsScreen> createState() => _MyPostsScreenState();
 }
 
-class _MyRentalsScreenState extends State<MyRentalsScreen>
+class _MyPostsScreenState extends State<MyPostsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -34,17 +35,18 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Posts'),
+        title: Text(l.tr('my_posts_title')),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppTheme.primaryTeal,
           labelColor: AppTheme.primaryTeal,
           unselectedLabelColor: AppTheme.textSecondary,
-          tabs: const [
-            Tab(text: 'My Listings'),
-            Tab(text: 'My Requests'),
+          tabs: [
+            Tab(text: l.tr('my_listings_tab')),
+            Tab(text: l.tr('my_requests_tab')),
           ],
         ),
       ),
@@ -64,6 +66,7 @@ class MyListingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final authService = Provider.of<AuthService>(context, listen: false);
     final firestoreService = FirestoreService();
 
@@ -74,7 +77,7 @@ class MyListingsTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(child: Text('${l.tr('error')}: ${snapshot.error}'));
         }
         final items = snapshot.data ?? [];
         if (items.isEmpty) {
@@ -84,7 +87,7 @@ class MyListingsTab extends StatelessWidget {
               children: [
                 Icon(Icons.inventory_2_outlined, size: 64, color: AppTheme.textHint),
                 const SizedBox(height: 16),
-                Text('No listings yet', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary)),
+                Text(l.tr('no_listings_yet'), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary)),
               ],
             ),
           );
@@ -107,6 +110,7 @@ class MyRequestsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final authService = Provider.of<AuthService>(context, listen: false);
     final firestoreService = FirestoreService();
 
@@ -117,7 +121,7 @@ class MyRequestsTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(child: Text('${l.tr('error')}: ${snapshot.error}'));
         }
         final requests = snapshot.data ?? [];
         if (requests.isEmpty) {
@@ -127,7 +131,7 @@ class MyRequestsTab extends StatelessWidget {
               children: [
                 Icon(Icons.search_off, size: 64, color: AppTheme.textHint),
                 const SizedBox(height: 16),
-                Text('No requests yet', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary)),
+                Text(l.tr('no_requests_yet'), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary)),
               ],
             ),
           );
@@ -150,6 +154,7 @@ class RentalItemCard extends StatelessWidget {
   const RentalItemCard({super.key, required this.item});
 
   Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    final l = AppLocalizations.of(context);
     if (item.status == newStatus) return;
     try {
       final updates = <String, dynamic>{'status': newStatus};
@@ -160,13 +165,13 @@ class RentalItemCard extends StatelessWidget {
       await FirestoreService().updateRentalItem(item.id, updates);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('อัพเดทสถานะเรียบร้อยแล้ว'), backgroundColor: AppTheme.secondaryGreen),
+          SnackBar(content: Text(l.tr('status_updated_msg')), backgroundColor: AppTheme.secondaryGreen),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text('${l.tr('error')}: $e'), backgroundColor: AppTheme.error),
         );
       }
     }
@@ -215,7 +220,7 @@ class RentalItemCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('฿${item.dailyRate} / day', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.primaryTeal, fontWeight: FontWeight.bold)),
+                  Text('฿${item.dailyRate} / ${AppLocalizations.of(context).tr('day')}', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.primaryTeal, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -226,12 +231,13 @@ class RentalItemCard extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(BuildContext context) {
+    final l = AppLocalizations.of(context);
     Color bg;
     String label;
     switch (item.status) {
-      case 'available': bg = AppTheme.statusAvailable; label = 'Available'; break;
-      case 'rented': bg = AppTheme.statusRented; label = 'Rented'; break;
-      case 'hidden': bg = Colors.grey; label = 'Hidden'; break;
+      case 'available': bg = AppTheme.statusAvailable; label = l.tr('status_available'); break;
+      case 'rented': bg = AppTheme.statusRented; label = l.tr('status_rented'); break;
+      case 'hidden': bg = Colors.grey; label = l.tr('status_hidden'); break;
       default: bg = AppTheme.textHint; label = item.status;
     }
 
@@ -239,9 +245,9 @@ class RentalItemCard extends StatelessWidget {
       onSelected: (val) => _updateStatus(context, val),
       offset: const Offset(0, 40),
       itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'available', child: Text('Available')),
-        const PopupMenuItem(value: 'rented', child: Text('Rented')),
-        const PopupMenuItem(value: 'hidden', child: Text('Hidden')),
+        PopupMenuItem(value: 'available', child: Text(l.tr('status_available'))),
+        PopupMenuItem(value: 'rented', child: Text(l.tr('status_rented'))),
+        PopupMenuItem(value: 'hidden', child: Text(l.tr('status_hidden'))),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -258,6 +264,7 @@ class RentalItemCard extends StatelessWidget {
   }
 
   Widget _buildMenuButton(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
       onSelected: (val) async {
@@ -267,20 +274,27 @@ class RentalItemCard extends StatelessWidget {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('ลบโพสต์'),
-              content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้?'),
+              title: Text(l.tr('delete_confirm_title')),
+              content: Text(l.tr('delete_confirm_msg')),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
-                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error), child: const Text('ลบ')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.tr('cancel'))),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error), child: Text(l.tr('delete'))),
               ],
             ),
           );
-          if (confirm == true) await FirestoreService().deleteRentalItem(item.id);
+          if (confirm == true) {
+            await FirestoreService().deleteRentalItem(item.id);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l.tr('post_deleted_msg')), backgroundColor: AppTheme.secondaryGreen),
+              );
+            }
+          }
         }
       },
       itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'edit', child: Text('แก้ไขโพสต์')),
-        const PopupMenuItem(value: 'delete', child: Text('ลบโพสต์', style: TextStyle(color: Colors.red))),
+        PopupMenuItem(value: 'edit', child: Text(l.tr('edit_post'))),
+        PopupMenuItem(value: 'delete', child: Text(l.tr('delete_post'), style: const TextStyle(color: Colors.red))),
       ],
     );
   }
@@ -291,18 +305,19 @@ class RentalRequestCard extends StatelessWidget {
   const RentalRequestCard({super.key, required this.request});
 
   Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    final l = AppLocalizations.of(context);
     if (request.status == newStatus) return;
     try {
       await FirestoreService().updateRentalRequest(request.id, {'status': newStatus});
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('อัพเดทสถานะเรียบร้อยแล้ว'), backgroundColor: AppTheme.secondaryGreen),
+          SnackBar(content: Text(l.tr('status_updated_msg')), backgroundColor: AppTheme.secondaryGreen),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text('${l.tr('error')}: $e'), backgroundColor: AppTheme.error),
         );
       }
     }
@@ -310,6 +325,7 @@ class RentalRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final isHidden = request.status == 'hidden';
     return Container(
       decoration: BoxDecoration(
@@ -337,7 +353,7 @@ class RentalRequestCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('ต้องการเช่า: ${request.itemDescription}', style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('${l.tr('want_to_rent_label')} ${request.itemDescription}', style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                         Text(request.category, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
                       ],
                     ),
@@ -350,8 +366,8 @@ class RentalRequestCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Target Budget', style: Theme.of(context).textTheme.bodySmall),
-                  Text('฿${request.estimatedBudget} / day', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.primaryTeal, fontWeight: FontWeight.bold)),
+                  Text(l.tr('target_budget_label'), style: Theme.of(context).textTheme.bodySmall),
+                  Text('฿${request.estimatedBudget} / ${l.tr('day')}', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.primaryTeal, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -362,12 +378,13 @@ class RentalRequestCard extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(BuildContext context) {
+    final l = AppLocalizations.of(context);
     Color bg;
     String label;
     switch (request.status) {
-      case 'active': bg = AppTheme.statusAvailable; label = 'Active'; break;
-      case 'fulfilled': bg = Colors.blue; label = 'Fulfilled'; break;
-      case 'hidden': bg = Colors.grey; label = 'Hidden'; break;
+      case 'active': bg = AppTheme.statusAvailable; label = l.tr('status_active'); break;
+      case 'fulfilled': bg = Colors.blue; label = l.tr('status_fulfilled'); break;
+      case 'hidden': bg = Colors.grey; label = l.tr('status_hidden'); break;
       default: bg = AppTheme.textHint; label = request.status;
     }
 
@@ -375,9 +392,9 @@ class RentalRequestCard extends StatelessWidget {
       onSelected: (val) => _updateStatus(context, val),
       offset: const Offset(0, 40),
       itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'active', child: Text('Active')),
-        const PopupMenuItem(value: 'fulfilled', child: Text('Fulfilled')),
-        const PopupMenuItem(value: 'hidden', child: Text('Hidden')),
+        PopupMenuItem(value: 'active', child: Text(l.tr('status_active'))),
+        PopupMenuItem(value: 'fulfilled', child: Text(l.tr('status_fulfilled'))),
+        PopupMenuItem(value: 'hidden', child: Text(l.tr('status_hidden'))),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -394,6 +411,7 @@ class RentalRequestCard extends StatelessWidget {
   }
 
   Widget _buildMenuButton(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
       onSelected: (val) async {
@@ -403,20 +421,27 @@ class RentalRequestCard extends StatelessWidget {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('ลบประกาศ'),
-              content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้?'),
+              title: Text(l.tr('delete_confirm_title')),
+              content: Text(l.tr('delete_confirm_msg')),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
-                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error), child: const Text('ลบ')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.tr('cancel'))),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error), child: Text(l.tr('delete'))),
               ],
             ),
           );
-          if (confirm == true) await FirestoreService().deleteRentalRequest(request.id);
+          if (confirm == true) {
+            await FirestoreService().deleteRentalRequest(request.id);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l.tr('post_deleted_msg')), backgroundColor: AppTheme.secondaryGreen),
+              );
+            }
+          }
         }
       },
       itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'edit', child: Text('แก้ไขประกาศ')),
-        const PopupMenuItem(value: 'delete', child: Text('ลบประกาศ', style: TextStyle(color: Colors.red))),
+        PopupMenuItem(value: 'edit', child: Text(l.tr('edit_post'))),
+        PopupMenuItem(value: 'delete', child: Text(l.tr('delete_post'), style: const TextStyle(color: Colors.red))),
       ],
     );
   }

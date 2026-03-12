@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'home_tab.dart';
-import '../rentals/my_rentals_screen.dart';
+import '../rentals/my_posts_screen.dart';
 import '../rentals/post_rental_screen.dart';
 import '../rentals/post_request_screen.dart';
 import '../chat/chat_list_screen.dart';
@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _screens = [
     const HomeTab(),
-    const MyRentalsScreen(),
+    const MyPostsScreen(),
     const PostTab(),
     const ChatListScreen(),
     const ProfileScreen(),
