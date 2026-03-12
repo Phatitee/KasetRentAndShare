@@ -176,6 +176,52 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _confirmDeleteChat() async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.tr('delete_chat_title') ?? 'ลบประวัติแชท'),
+        content: Text(l.tr('delete_chat_confirm') ?? 'คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการสนทนาทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.tr('cancel')),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text(l.tr('delete') ?? 'ลบ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await FirestoreService().deleteChat(widget.chatId);
+        if (mounted) {
+          Navigator.pop(context); // Go back to chat list
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.tr('chat_deleted') ?? 'ลบประวัติแชทเรียบร้อยแล้ว'),
+              backgroundColor: AppTheme.secondaryGreen,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -197,11 +243,27 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Show chat options
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'delete') {
+                _confirmDeleteChat();
+              }
             },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppLocalizations.of(context).tr('delete_chat') ?? 'ลบประวัติแชท',
+                      style: const TextStyle(color: AppTheme.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
