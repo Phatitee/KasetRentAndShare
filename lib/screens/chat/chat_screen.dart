@@ -183,17 +183,37 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(widget.otherUserName),
-            if (widget.rentalItemName != null)
-              Text(
-                'Renting: ${widget.rentalItemName}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
+            UserAvatar(
+              photoUrl: _otherUser?.photoUrl,
+              name: widget.otherUserName,
+              radius: 18,
+              fontSize: 14,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.otherUserName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  if (widget.rentalItemName != null)
+                    Text(
+                      'Renting: ${widget.rentalItemName}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                ],
               ),
+            ),
           ],
         ),
         actions: [
@@ -203,6 +223,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showReportDialog();
               } else if (value == 'block') {
                 _handleBlockUser();
+              } else if (value == 'delete') {
+                _handleDeleteChat();
               }
             },
             itemBuilder: (context) => [
@@ -223,6 +245,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     Icon(Icons.block, color: AppTheme.error, size: 20),
                     SizedBox(width: 8),
                     Text('บล็อกผู้ใช้', style: TextStyle(color: AppTheme.error)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('ลบการสนทนา', style: TextStyle(color: AppTheme.error)),
                   ],
                 ),
               ),
@@ -1620,6 +1653,37 @@ class _ChatScreenState extends State<ChatScreen> {
         Navigator.pop(context); // Exit chat
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('บล็อกผู้ใช้เรียบร้อยแล้ว')),
+        );
+      }
+    }
+  }
+
+  void _handleDeleteChat() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ลบการสนทนา?'),
+        content: const Text('ข้อความทั้งหมดจะถูกลบและไม่สามารถกู้คืนได้'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await FirestoreService().deleteChat(widget.chatId);
+      if (mounted) {
+        Navigator.pop(context); // Exit chat
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ลบการสนทนาเรียบร้อยแล้ว')),
         );
       }
     }

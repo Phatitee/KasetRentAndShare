@@ -70,9 +70,45 @@ class ChatListScreen extends StatelessWidget {
             itemCount: chats.length,
             itemBuilder: (context, index) {
               final chat = chats[index];
-              return _ChatListItem(
-                chat: chat,
-                currentUserId: currentUserId,
+              return Dismissible(
+                key: Key(chat.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  color: AppTheme.error,
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                confirmDismiss: (direction) async {
+                  return await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('ลบการสนทนา?'),
+                      content: const Text('ข้อความทั้งหมดจะถูกลบและไม่สามารถกู้คืนได้'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('ยกเลิก'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+                          child: const Text('ลบ'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                onDismissed: (direction) {
+                  FirestoreService().deleteChat(chat.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ลบการสนทนาแล้ว')),
+                  );
+                },
+                child: _ChatListItem(
+                  chat: chat,
+                  currentUserId: currentUserId,
+                ),
               );
             },
           );
