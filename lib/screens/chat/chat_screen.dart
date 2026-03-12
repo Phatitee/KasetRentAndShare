@@ -197,11 +197,36 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Show chat options
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'report') {
+                _showReportDialog();
+              } else if (value == 'block') {
+                _handleBlockUser();
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.report_outlined, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Text('รายงานผู้ใช้'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(Icons.block, color: AppTheme.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('บล็อกผู้ใช้', style: TextStyle(color: AppTheme.error)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1499,6 +1524,104 @@ class _ChatScreenState extends State<ChatScreen> {
       return 'Yesterday';
     } else {
       return DateFormat('d MMM yyyy').format(date);
+    }
+  }
+
+  void _showReportDialog() {
+    final reasonController = TextEditingController();
+    final detailsController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('รายงานผู้ใช้'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'หัวข้อการรายงาน',
+                hintText: 'เช่น พฤติกรรมไม่เหมาะสม, หลอกลวง',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: detailsController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'รายละเอียด',
+                hintText: 'อธิบายเหตุการณ์ที่เกิดขึ้น...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.isEmpty) return;
+              
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final currentUserId = authService.currentUser!.uid;
+              
+              await FirestoreService().reportUser(
+                reporterId: currentUserId,
+                reportedUserId: widget.otherUserId,
+                reason: reasonController.text.trim(),
+                details: detailsController.text.trim(),
+              );
+              
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('ส่งรายงานเรียบร้อยแล้ว')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('ส่งรายงาน'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleBlockUser() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('บล็อกผู้ใช้?'),
+        content: const Text('คุณจะไม่เห็นข้อความจากผู้ใช้นี้อีก และไม่สามารถติดต่อกันได้'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('บล็อก'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUserId = authService.currentUser!.uid;
+      
+      await FirestoreService().blockUser(currentUserId, widget.otherUserId);
+      
+      if (mounted) {
+        Navigator.pop(context); // Exit chat
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บล็อกผู้ใช้เรียบร้อยแล้ว')),
+        );
+      }
     }
   }
 }

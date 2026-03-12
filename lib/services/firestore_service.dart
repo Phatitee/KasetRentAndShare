@@ -764,4 +764,66 @@ class FirestoreService {
       print('Error updating user rating: $e');
     }
   }
+
+  // ========== Safety & Reports ==========
+
+  /// Report a user
+  Future<void> reportUser({
+    required String reporterId,
+    required String reportedUserId,
+    required String reason,
+    required String details,
+  }) async {
+    final docRef = _firestore.collection('reports').doc();
+    await docRef.set({
+      'reporterId': reporterId,
+      'reportedUserId': reportedUserId,
+      'reason': reason,
+      'details': details,
+      'createdAt': FieldValue.serverTimestamp(),
+      'status': 'pending',
+      'type': 'user',
+    });
+  }
+
+  /// Report a rental item
+  Future<void> reportItem({
+    required String reporterId,
+    required String reportedItemId,
+    required String reason,
+    required String details,
+  }) async {
+    final docRef = _firestore.collection('reports').doc();
+    await docRef.set({
+      'reporterId': reporterId,
+      'reportedItemId': reportedItemId,
+      'reason': reason,
+      'details': details,
+      'createdAt': FieldValue.serverTimestamp(),
+      'status': 'pending',
+      'type': 'item',
+    });
+  }
+
+  /// Block a user
+  Future<void> blockUser(String currentUserId, String targetUserId) async {
+    await _firestore.collection('users').doc(currentUserId).update({
+      'blockedUids': FieldValue.arrayUnion([targetUserId]),
+    });
+  }
+
+  /// Unblock a user
+  Future<void> unblockUser(String currentUserId, String targetUserId) async {
+    await _firestore.collection('users').doc(currentUserId).update({
+      'blockedUids': FieldValue.arrayRemove([targetUserId]),
+    });
+  }
+
+  /// Check if a user is blocked
+  Future<bool> isUserBlocked(String currentUserId, String targetUserId) async {
+    final doc = await _firestore.collection('users').doc(currentUserId).get();
+    if (!doc.exists) return false;
+    final blockedUids = List<String>.from(doc.data()?['blockedUids'] ?? []);
+    return blockedUids.contains(targetUserId);
+  }
 }
