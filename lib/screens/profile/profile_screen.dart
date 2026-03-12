@@ -11,7 +11,6 @@ import '../reviews/user_reviews_screen.dart';
 import '../contracts/contracts_list_screen.dart';
 import '../../widgets/user_avatar.dart';
 import 'rental_history_screen.dart';
-import 'settings_screen.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -107,16 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l.tr('profile_title')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadUserData,
@@ -316,6 +305,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildMenuSection() {
     final l = AppLocalizations.of(context);
     final authService = Provider.of<AuthService>(context, listen: false);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -386,6 +377,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
           const Divider(height: 1),
+          
+          // Language Toggle (Block style [ไทย | Eng])
+          ListTile(
+            leading: const Icon(Icons.language, color: AppTheme.primaryTeal),
+            title: Text(l.tr('language')),
+            trailing: Container(
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.divider),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Thai Block
+                  GestureDetector(
+                    onTap: () {
+                      if (!localeProvider.isThai) localeProvider.setLocale('th');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: localeProvider.isThai
+                            ? AppTheme.primaryTeal
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'ไทย',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: localeProvider.isThai
+                              ? Colors.white
+                              : AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // English Block
+                  GestureDetector(
+                    onTap: () {
+                      if (!localeProvider.isEnglish) localeProvider.setLocale('en');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: localeProvider.isEnglish
+                            ? AppTheme.primaryTeal
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Eng',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: localeProvider.isEnglish
+                              ? Colors.white
+                              : AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+
           _buildMenuItem(
             icon: Icons.help_outline,
             title: l.tr('help_support'),
@@ -406,9 +470,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
           const Divider(height: 1),
-          _buildMenuItem(
-            icon: Icons.info_outline,
-            title: l.tr('about'),
+          
+          // Version info (Moved from Settings)
+          ListTile(
+            leading: const Icon(Icons.info_outline, color: AppTheme.primaryTeal),
+            title: Text(l.tr('version')),
+            trailing: Text(
+              '1.0.0',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+              ),
+            ),
             onTap: () {
               showAboutDialog(
                 context: context,
